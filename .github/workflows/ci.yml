@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      # pcap4j loads libpcap.so through JNA; the -dev package provides the unversioned symlink.
+      - name: Install libpcap
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libpcap-dev
+
+      - name: Build, test, format and coverage checks
+        run: mvn -B verify
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-report
+          path: target/site/jacoco/
+          if-no-files-found: ignore
