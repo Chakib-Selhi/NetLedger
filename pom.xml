@@ -12,10 +12,17 @@
     </parent>
 
     <groupId>io.github.chakibselhi</groupId>
-    <artifactId>netledger</artifactId>
+    <artifactId>netledger-parent</artifactId>
     <version>0.1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
     <name>NetLedger</name>
-    <description>Passive home network device inventory with alerts</description>
+    <description>Network device inventory: native macOS agent and Docker server</description>
+
+    <modules>
+        <module>core</module>
+        <module>agent</module>
+        <module>server</module>
+    </modules>
 
     <properties>
         <java.version>21</java.version>
@@ -25,66 +32,62 @@
         <jmdns.version>3.6.5</jmdns.version>
         <sqlite-jdbc.version>3.54.1.0</sqlite-jdbc.version>
         <spotless.version>3.11.0</spotless.version>
+        <!-- 1.37.0 fails inside Spotless 3.11 -->
         <google-java-format.version>1.35.0</google-java-format.version>
         <jacoco.version>0.8.16</jacoco.version>
         <jacoco.minimum.coverage>0.80</jacoco.minimum.coverage>
     </properties>
 
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>io.github.chakibselhi</groupId>
+                <artifactId>netledger-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.pcap4j</groupId>
+                <artifactId>pcap4j-core</artifactId>
+                <version>${pcap4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.pcap4j</groupId>
+                <artifactId>pcap4j-packetfactory-static</artifactId>
+                <version>${pcap4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>net.java.dev.jna</groupId>
+                <artifactId>jna</artifactId>
+                <version>${jna.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.jmdns</groupId>
+                <artifactId>jmdns</artifactId>
+                <version>${jmdns.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.xerial</groupId>
+                <artifactId>sqlite-jdbc</artifactId>
+                <version>${sqlite-jdbc.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-jdbc</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.xerial</groupId>
-            <artifactId>sqlite-jdbc</artifactId>
-            <version>${sqlite-jdbc.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.pcap4j</groupId>
-            <artifactId>pcap4j-core</artifactId>
-            <version>${pcap4j.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.pcap4j</groupId>
-            <artifactId>pcap4j-packetfactory-static</artifactId>
-            <version>${pcap4j.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>net.java.dev.jna</groupId>
-            <artifactId>jna</artifactId>
-            <version>${jna.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.jmdns</groupId>
-            <artifactId>jmdns</artifactId>
-            <version>${jmdns.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
 
     <build>
-        <finalName>netledger</finalName>
         <plugins>
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-            </plugin>
-
             <plugin>
                 <groupId>com.diffplug.spotless</groupId>
                 <artifactId>spotless-maven-plugin</artifactId>
@@ -134,10 +137,10 @@
                                 <rule>
                                     <element>PACKAGE</element>
                                     <includes>
-                                        <include>*netledger?decode*</include>
-                                        <include>*netledger?correlation*</include>
-                                        <include>*netledger?identification*</include>
-                                        <include>*netledger?alerting*</include>
+                                        <include>*netledger?core*</include>
+                                        <include>*netledger?server?correlation*</include>
+                                        <include>*netledger?server?identification*</include>
+                                        <include>*netledger?server?alerting*</include>
                                     </includes>
                                     <limits>
                                         <limit>
