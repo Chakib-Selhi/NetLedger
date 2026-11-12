@@ -1,0 +1,13 @@
+spring:
+  application:
+    name: netledger
+  datasource:
+    url: jdbc:sqlite:${netledger.data-dir}/netledger.db?foreign_keys=true&journal_mode=WAL&busy_timeout=5000
+    driver-class-name: org.sqlite.JDBC
+    hikari:
+      maximum-pool-size: 4
+  flyway:
+    locations: classpath:db/migration
+
+netledger:
+  data-dir: ./data
