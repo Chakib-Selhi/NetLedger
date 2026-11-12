@@ -16,6 +16,8 @@ import org.springframework.test.context.DynamicPropertySource;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 class SchemaMigrationTest {
 
+  private static final String NOW = "2026-11-12T18:00:00Z";
+
   @TempDir static Path dataDir;
 
   @DynamicPropertySource
@@ -34,7 +36,8 @@ class SchemaMigrationTest {
             String.class);
 
     assertThat(tables)
-        .containsExactlyInAnyOrder("device", "observation", "ip_history", "service", "event");
+        .containsExactlyInAnyOrder(
+            "network", "device", "observation", "ip_history", "service", "event");
   }
 
   @Test
@@ -68,17 +71,64 @@ class SchemaMigrationTest {
   }
 
   @Test
+  void newNetworkIsNotTrustedByDefault() {
+    long network = insertNetwork("02:00:00:00:00:a1", "10.0.0.0/24");
+
+    assertThat(jdbc.queryForObject("SELECT trust FROM network WHERE id = ?", String.class, network))
+        .isEqualTo("unset");
+  }
+
+  @Test
   void appliesDeviceDefaults() {
-    jdbc.update(
-        "INSERT INTO device (mac, first_seen, last_seen) VALUES (?, ?, ?)",
-        "02:00:00:00:00:01",
-        "2026-11-12T18:00:00Z",
-        "2026-11-12T18:00:00Z");
+    long network = insertNetwork("02:00:00:00:00:a2", "10.0.1.0/24");
+    insertDevice(network, "02:00:00:00:00:01");
 
     var row =
         jdbc.queryForMap(
-            "SELECT status, mac_randomized FROM device WHERE mac = ?", "02:00:00:00:00:01");
+            "SELECT status, mac_randomized FROM device WHERE network_id = ? AND mac = ?",
+            network,
+            "02:00:00:00:00:01");
 
     assertThat(row).containsEntry("status", "new").containsEntry("mac_randomized", 0);
+  }
+
+  @Test
+  void sameMacOnTwoNetworksGivesTwoDevices() {
+    long home = insertNetwork("02:00:00:00:00:a3", "192.168.1.0/24");
+    long school = insertNetwork("02:00:00:00:00:a4", "172.16.0.0/16");
+
+    insertDevice(home, "02:00:00:00:00:02");
+    insertDevice(school, "02:00:00:00:00:02");
+
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM device WHERE mac = ?", Integer.class, "02:00:00:00:00:02"))
+        .isEqualTo(2);
+    assertThatThrownBy(() -> insertDevice(home, "02:00:00:00:00:02"))
+        .isInstanceOf(DataAccessException.class)
+        .hasMessageContaining("SQLITE_CONSTRAINT_UNIQUE");
+  }
+
+  private long insertNetwork(String gatewayMac, String subnet) {
+    jdbc.update(
+        "INSERT INTO network (gateway_mac, subnet, first_seen, last_seen) VALUES (?, ?, ?, ?)",
+        gatewayMac,
+        subnet,
+        NOW,
+        NOW);
+    return jdbc.queryForObject(
+        "SELECT id FROM network WHERE gateway_mac = ? AND subnet = ?",
+        Long.class,
+        gatewayMac,
+        subnet);
+  }
+
+  private void insertDevice(long networkId, String mac) {
+    jdbc.update(
+        "INSERT INTO device (network_id, mac, first_seen, last_seen) VALUES (?, ?, ?, ?)",
+        networkId,
+        mac,
+        NOW,
+        NOW);
   }
 }
