@@ -4,11 +4,14 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.chakibselhi.netledger.core.model.Observation;
 import io.github.chakibselhi.netledger.core.model.ServiceAnnouncement;
+import io.github.chakibselhi.netledger.server.alerting.AlertRules;
+import io.github.chakibselhi.netledger.server.alerting.AlertRules.DeviceState;
 import io.github.chakibselhi.netledger.server.config.NetLedgerProperties;
 import io.github.chakibselhi.netledger.server.correlation.DeviceRepository.DeviceRow;
 import io.github.chakibselhi.netledger.server.identification.DeviceFacts;
 import io.github.chakibselhi.netledger.server.identification.DeviceTypeRules;
 import io.github.chakibselhi.netledger.server.identification.OuiRegistryProvider;
+import io.github.chakibselhi.netledger.server.network.Network;
 import io.github.chakibselhi.netledger.server.network.NetworkRepository;
 import io.github.chakibselhi.netledger.server.persistence.Timestamps;
 import java.time.Clock;
@@ -37,6 +40,7 @@ public class CorrelationEngine {
   private final NetworkRepository networks;
   private final OuiRegistryProvider oui;
   private final DeviceTypeRules typeRules;
+  private final AlertRules alerts;
   private final ObservationValidator validator;
   private final TransactionTemplate transaction;
   private final ObjectMapper json;
@@ -48,6 +52,7 @@ public class CorrelationEngine {
       NetworkRepository networks,
       OuiRegistryProvider oui,
       DeviceTypeRules typeRules,
+      AlertRules alerts,
       NetLedgerProperties properties,
       TransactionTemplate transaction,
       ObjectMapper json,
@@ -56,6 +61,7 @@ public class CorrelationEngine {
     this.networks = networks;
     this.oui = oui;
     this.typeRules = typeRules;
+    this.alerts = alerts;
     this.validator = new ObservationValidator(properties.maxClockSkew());
     this.transaction = transaction;
     this.json = json;
@@ -72,6 +78,11 @@ public class CorrelationEngine {
   }
 
   private IngestResult apply(long networkId, List<Observation> observations) {
+    Network network =
+        alerts.ensureLearningStarted(
+            networks
+                .findById(networkId)
+                .orElseThrow(() -> new IllegalArgumentException("Unknown network " + networkId)));
     Instant now = clock.instant();
     int accepted = 0;
     Instant latest = null;
@@ -81,7 +92,7 @@ public class CorrelationEngine {
         continue;
       }
       Observation o = valid.get();
-      apply(networkId, o);
+      apply(network, o);
       accepted++;
       latest = latest == null || o.observedAt().isAfter(latest) ? o.observedAt() : latest;
     }
@@ -91,14 +102,19 @@ public class CorrelationEngine {
     return new IngestResult(accepted, observations.size() - accepted);
   }
 
-  private void apply(long networkId, Observation o) {
+  private void apply(Network network, Observation o) {
+    long networkId = network.id();
     String at = Timestamps.format(o.observedAt());
     boolean randomized = isRandomized(o.mac());
     Optional<DeviceRow> existing = devices.find(networkId, o.mac());
     long deviceId;
     String fingerprint;
     String vendor;
+    String hostname;
+    String status;
     if (existing.isEmpty()) {
+      hostname = o.hostname();
+      status = "new";
       vendor = randomized ? null : oui.registry().vendorOf(o.mac()).orElse(null);
       fingerprint = o.dhcpFingerprint();
       deviceId =
@@ -112,12 +128,14 @@ public class CorrelationEngine {
               ? row.vendor()
               : oui.registry().vendorOf(o.mac()).orElse(null);
       fingerprint = merge(row.dhcpFingerprint(), o.dhcpFingerprint(), newest);
+      hostname = merge(row.hostname(), o.hostname(), newest);
+      status = row.status();
       deviceId = row.id();
       devices.update(
           deviceId,
           newest ? at : row.lastSeen(),
           merge(row.lastIp(), o.ip(), newest),
-          merge(row.hostname(), o.hostname(), newest),
+          hostname,
           fingerprint,
           vendor);
     }
@@ -136,6 +154,18 @@ public class CorrelationEngine {
             randomized,
             vendor);
     devices.setGuessedType(deviceId, typeRules.guess(facts).value());
+    alerts.onObservation(
+        network,
+        new DeviceState(
+            deviceId,
+            o.mac(),
+            randomized,
+            vendor,
+            hostname,
+            fingerprint,
+            status,
+            existing.isEmpty()),
+        o);
   }
 
   /** A newer non-null value replaces the stored one; an older one only fills a gap. */

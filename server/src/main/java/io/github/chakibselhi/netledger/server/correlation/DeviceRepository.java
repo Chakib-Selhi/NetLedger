@@ -21,7 +21,8 @@ class DeviceRepository {
       String hostname,
       String dhcpFingerprint,
       String vendor,
-      boolean randomized) {}
+      boolean randomized,
+      String status) {}
 
   private final JdbcClient jdbc;
 
@@ -32,7 +33,7 @@ class DeviceRepository {
   Optional<DeviceRow> find(long networkId, String mac) {
     return jdbc.sql(
             """
-            SELECT id, last_seen, last_ip, hostname, dhcp_fingerprint, vendor, mac_randomized
+            SELECT id, last_seen, last_ip, hostname, dhcp_fingerprint, vendor, mac_randomized, status
             FROM device WHERE network_id = :network AND mac = :mac
             """)
         .param("network", networkId)
@@ -161,6 +162,7 @@ class DeviceRepository {
         rs.getString("hostname"),
         rs.getString("dhcp_fingerprint"),
         rs.getString("vendor"),
-        rs.getInt("mac_randomized") == 1);
+        rs.getInt("mac_randomized") == 1,
+        rs.getString("status"));
   }
 }

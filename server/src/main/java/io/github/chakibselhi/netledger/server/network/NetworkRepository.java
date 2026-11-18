@@ -23,7 +23,7 @@ public class NetworkRepository {
             INSERT INTO network (gateway_mac, subnet, first_seen, last_seen)
             VALUES (:mac, :subnet, :now, :now)
             ON CONFLICT (gateway_mac, subnet) DO UPDATE SET last_seen = MAX(last_seen, excluded.last_seen)
-            RETURNING id, gateway_mac, subnet, label, trust
+            RETURNING id, gateway_mac, subnet, label, trust, learning_until, last_seen
             """)
         .param("mac", gatewayMac)
         .param("subnet", subnet.toString())
@@ -33,10 +33,28 @@ public class NetworkRepository {
   }
 
   public Optional<Network> findById(long id) {
-    return jdbc.sql("SELECT id, gateway_mac, subnet, label, trust FROM network WHERE id = :id")
+    return jdbc.sql(
+            "SELECT id, gateway_mac, subnet, label, trust, learning_until, last_seen FROM network WHERE id = :id")
         .param("id", id)
         .query(NetworkRepository::map)
         .optional();
+  }
+
+  public Optional<Network> find(String gatewayMac, Subnet subnet) {
+    return jdbc.sql(
+            "SELECT id, gateway_mac, subnet, label, trust, learning_until, last_seen FROM network"
+                + " WHERE gateway_mac = :mac AND subnet = :subnet")
+        .param("mac", gatewayMac)
+        .param("subnet", subnet.toString())
+        .query(NetworkRepository::map)
+        .optional();
+  }
+
+  public void setLearningUntil(long id, Instant until) {
+    jdbc.sql("UPDATE network SET learning_until = :until WHERE id = :id")
+        .param("until", Timestamps.format(until))
+        .param("id", id)
+        .update();
   }
 
   public void touch(long id, Instant seenAt) {
@@ -59,6 +77,8 @@ public class NetworkRepository {
         rs.getString("gateway_mac"),
         rs.getString("subnet"),
         rs.getString("label"),
-        Trust.fromValue(rs.getString("trust")));
+        Trust.fromValue(rs.getString("trust")),
+        rs.getString("learning_until"),
+        rs.getString("last_seen"));
   }
 }
