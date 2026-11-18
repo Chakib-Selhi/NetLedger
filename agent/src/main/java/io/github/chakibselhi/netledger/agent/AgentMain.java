@@ -1,0 +1,103 @@
+package io.github.chakibselhi.netledger.agent;
+
+import io.github.chakibselhi.netledger.agent.buffer.ObservationBuffer;
+import io.github.chakibselhi.netledger.agent.capture.CaptureSession;
+import io.github.chakibselhi.netledger.agent.capture.PcapPacketSource;
+import io.github.chakibselhi.netledger.agent.config.AgentConfig;
+import io.github.chakibselhi.netledger.agent.config.KeychainTokenStore;
+import io.github.chakibselhi.netledger.agent.mdns.MdnsQuerier;
+import io.github.chakibselhi.netledger.agent.network.NetworkDetector;
+import io.github.chakibselhi.netledger.agent.server.ServerClient;
+import io.github.chakibselhi.netledger.agent.system.ProcessCommandRunner;
+import java.nio.file.Path;
+import java.time.Clock;
+import java.time.Duration;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/** Command-line entry point of the agent (the menu bar app comes in phase 4). */
+public final class AgentMain {
+
+  private static final Logger log = LoggerFactory.getLogger(AgentMain.class);
+
+  private AgentMain() {}
+
+  public static void main(String[] args) throws Exception {
+    Path configFile = args.length > 0 ? Path.of(args[0]) : AgentConfig.defaultFile();
+    AgentConfig config = AgentConfig.load(configFile);
+    var commands = new ProcessCommandRunner(Duration.ofSeconds(5));
+    String token =
+        new KeychainTokenStore(commands)
+            .read()
+            .orElseThrow(
+                () ->
+                    new IllegalStateException(
+                        "No token in the keychain: run scripts/install-agent-token.sh"));
+
+    var server = new ServerClient(config.serverUrl(), token, Duration.ofSeconds(10));
+    var detector =
+        new NetworkDetector(
+            commands, NetworkDetector::javaInterfaceLookup, config.interfaceOverride());
+    var buffer = new ObservationBuffer(config.bufferCapacity(), config.dedupWindow());
+    var querier = new MdnsQuerier();
+    var agent =
+        new Agent(
+            config,
+            detector::detect,
+            server,
+            buffer,
+            (network, networkId, target) ->
+                new CaptureSession(
+                        new PcapPacketSource(network.interfaceName()),
+                        networkId,
+                        target,
+                        network.interfaceName())
+                    .start(),
+            (network, decision) -> querier.queryServiceTypes(network.localIp()),
+            (network, decision) -> log.info("ARP scan is not implemented yet"),
+            Clock.systemUTC());
+
+    log.info("NetLedger agent started; server {}", config.serverUrl());
+    var scheduler =
+        Executors.newSingleThreadScheduledExecutor(
+            r -> Thread.ofPlatform().name("agent").unstarted(r));
+    scheduler.scheduleWithFixedDelay(
+        () -> {
+          try {
+            agent.tick();
+          } catch (RuntimeException e) {
+            log.error("Agent step failed", e);
+          }
+        },
+        0,
+        config.tickInterval().toMillis(),
+        TimeUnit.MILLISECONDS);
+    scheduler.scheduleWithFixedDelay(
+        () -> log.info("{}", describe(agent.status())), 1, 1, TimeUnit.MINUTES);
+    Runtime.getRuntime()
+        .addShutdownHook(
+            new Thread(
+                () -> {
+                  scheduler.shutdownNow();
+                  agent.shutdown();
+                  log.info("NetLedger agent stopped");
+                }));
+    Thread.currentThread().join();
+  }
+
+  static String describe(Agent.Status s) {
+    String network = s.network() == null ? "offline" : s.network().subnet();
+    String trust = s.decision() == null ? "?" : s.decision().trust();
+    return "network=%s trust=%s capturing=%s buffered=%d sent=%d dropped=%d server=%s"
+        .formatted(
+            network,
+            trust,
+            s.capturing(),
+            s.buffered(),
+            s.sent(),
+            s.dropped(),
+            s.serverReachable() ? "up" : "down");
+  }
+}
