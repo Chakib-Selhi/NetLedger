@@ -13,4 +13,15 @@
     <artifactId>netledger-core</artifactId>
     <name>NetLedger Core</name>
     <description>Observation model, ARP/DHCP/mDNS decoders and exchange format</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+    </dependencies>
 </project>
