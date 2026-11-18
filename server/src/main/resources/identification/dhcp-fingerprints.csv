@@ -1,0 +1,4 @@
+# DHCP option 55 (parameter request list) -> operating system family.
+# Format: fingerprint;os;source. os is one of ios, android, macos, windows, linux.
+# Only add fingerprints observed on real devices, and say where they come from.
+1,121,3,6,15,108,114,119,162,252,95,44,46;macos;capture 2026-11-17, MacBook Air M3, macOS 27

@@ -1,0 +1,16 @@
+# IEEE organization names (or a distinctive part of them, case-insensitive) of vendors that
+# mostly make connected objects. Vendors that also make phones, computers or TVs stay out.
+Espressif
+Tuya
+Shelly
+Allterco
+Philips Lighting
+Signify
+ecobee
+Meross
+iRobot
+Wyze
+Nest Labs
+Ring LLC
+Sonoff
+ITEAD
