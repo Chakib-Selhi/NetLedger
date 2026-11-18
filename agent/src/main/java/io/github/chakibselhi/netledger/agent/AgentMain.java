@@ -7,6 +7,8 @@ import io.github.chakibselhi.netledger.agent.config.AgentConfig;
 import io.github.chakibselhi.netledger.agent.config.KeychainTokenStore;
 import io.github.chakibselhi.netledger.agent.mdns.MdnsQuerier;
 import io.github.chakibselhi.netledger.agent.network.NetworkDetector;
+import io.github.chakibselhi.netledger.agent.scan.ArpScanner;
+import io.github.chakibselhi.netledger.agent.scan.PcapFrameSender;
 import io.github.chakibselhi.netledger.agent.server.ServerClient;
 import io.github.chakibselhi.netledger.agent.system.ProcessCommandRunner;
 import java.nio.file.Path;
@@ -42,6 +44,7 @@ public final class AgentMain {
             commands, NetworkDetector::javaInterfaceLookup, config.interfaceOverride());
     var buffer = new ObservationBuffer(config.bufferCapacity(), config.dedupWindow());
     var querier = new MdnsQuerier();
+    var scanner = new ArpScanner(new PcapFrameSender());
     var agent =
         new Agent(
             config,
@@ -56,7 +59,12 @@ public final class AgentMain {
                         network.interfaceName())
                     .start(),
             (network, decision) -> querier.queryServiceTypes(network.localIp()),
-            (network, decision) -> log.info("ARP scan is not implemented yet"),
+            (network, decision) -> {
+              byte[] localMac =
+                  java.net.NetworkInterface.getByName(network.interfaceName()).getHardwareAddress();
+              int sent = scanner.scan(network, localMac);
+              log.info("ARP sweep: {} request(s) sent on {}", sent, network.subnet());
+            },
             Clock.systemUTC());
 
     log.info("NetLedger agent started; server {}", config.serverUrl());
