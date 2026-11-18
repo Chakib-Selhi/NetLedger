@@ -27,6 +27,9 @@ jobs:
       - name: Build, test, format and coverage checks
         run: mvn -B verify
 
+      - name: Build the server image
+        run: docker build --tag netledger-server:ci .
+
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v7

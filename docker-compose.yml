@@ -1,0 +1,27 @@
+# NetLedger server. Capture happens in the native macOS agent: Docker Desktop runs containers in
+# a Linux VM that cannot see the Mac's local network, so this container needs no network
+# privileges at all.
+services:
+  server:
+    build: .
+    image: netledger-server:local
+    container_name: netledger-server
+    restart: unless-stopped
+    ports:
+      # Loopback only: the dashboard and the API are never reachable from the network.
+      - "127.0.0.1:8080:8080"
+    environment:
+      NETLEDGER_AGENT_TOKEN: ${NETLEDGER_AGENT_TOKEN:?run scripts/generate-token.sh first}
+    volumes:
+      - netledger-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 300m
+
+volumes:
+  netledger-data:
