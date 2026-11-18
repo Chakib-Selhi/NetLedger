@@ -15,6 +15,11 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     return ProblemDetail.forStatusAndDetail(e.status(), e.getMessage());
   }
 
+  @ExceptionHandler(java.util.NoSuchElementException.class)
+  ProblemDetail handle(java.util.NoSuchElementException e) {
+    return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
+  }
+
   @ExceptionHandler(IllegalArgumentException.class)
   ProblemDetail handle(IllegalArgumentException e) {
     return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());

@@ -4,6 +4,7 @@ import io.github.chakibselhi.netledger.core.net.MacAddresses;
 import io.github.chakibselhi.netledger.server.alerting.AlertRules;
 import java.time.Clock;
 import java.util.Locale;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,9 +46,18 @@ public class NetworkService {
   /** Sets what the user declared; monitoring starts the learning period. */
   @Transactional
   public void changeTrust(long networkId, Trust trust) {
-    networks.setTrust(networkId, trust);
+    if (!networks.setTrust(networkId, trust)) {
+      throw new NoSuchElementException("Unknown network");
+    }
     if (trust.allowsCapture()) {
       networks.findById(networkId).ifPresent(alerts::ensureLearningStarted);
+    }
+  }
+
+  /** An empty label clears it. */
+  public void rename(long networkId, String label) {
+    if (!networks.setLabel(networkId, label == null || label.isEmpty() ? null : label)) {
+      throw new NoSuchElementException("Unknown network");
     }
   }
 }

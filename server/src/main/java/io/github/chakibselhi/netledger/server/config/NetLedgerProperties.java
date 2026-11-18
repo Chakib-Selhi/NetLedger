@@ -3,6 +3,7 @@ package io.github.chakibselhi.netledger.server.config;
 import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
@@ -15,6 +16,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param maxClockSkew how far in the future an observation timestamp may be
  * @param observationRetention how long raw observations are kept
  * @param oui IEEE registry settings
+ * @param allowedHosts names accepted in the {@code Host} header (see HostHeaderFilter)
  */
 @ConfigurationProperties("netledger")
 public record NetLedgerProperties(
@@ -23,7 +25,8 @@ public record NetLedgerProperties(
     @DefaultValue("1000") int maxBatchSize,
     @DefaultValue("PT5M") Duration maxClockSkew,
     @DefaultValue("P30D") Duration observationRetention,
-    @DefaultValue Oui oui) {
+    @DefaultValue Oui oui,
+    @DefaultValue({"127.0.0.1", "localhost", "[::1]"}) List<String> allowedHosts) {
 
   public static final int MIN_TOKEN_LENGTH = 32;
 

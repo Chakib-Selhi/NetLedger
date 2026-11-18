@@ -64,11 +64,20 @@ public class NetworkRepository {
         .update();
   }
 
-  public void setTrust(long id, Trust trust) {
-    jdbc.sql("UPDATE network SET trust = :trust WHERE id = :id")
-        .param("trust", trust.value())
-        .param("id", id)
-        .update();
+  public boolean setTrust(long id, Trust trust) {
+    return jdbc.sql("UPDATE network SET trust = :trust WHERE id = :id")
+            .param("trust", trust.value())
+            .param("id", id)
+            .update()
+        == 1;
+  }
+
+  public boolean setLabel(long id, String label) {
+    return jdbc.sql("UPDATE network SET label = :label WHERE id = :id")
+            .param("label", label)
+            .param("id", id)
+            .update()
+        == 1;
   }
 
   private static Network map(java.sql.ResultSet rs, int row) throws java.sql.SQLException {

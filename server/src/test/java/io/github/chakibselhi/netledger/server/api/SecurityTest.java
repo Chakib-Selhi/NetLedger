@@ -41,10 +41,20 @@ class SecurityTest {
   }
 
   @Test
-  void everythingOutsideTheApiIsClosedForNow() throws Exception {
-    mvc.perform(get("/")).andExpect(status().isNotFound());
+  void unknownPathsAreNotFound() throws Exception {
     mvc.perform(get("/actuator/env")).andExpect(status().isNotFound());
     mvc.perform(authorized(get("/api/v1/nope"))).andExpect(status().isNotFound());
+  }
+
+  @Test
+  void refusesRequestsAddressedToAnotherHostName() throws Exception {
+    mvc.perform(authorized(get("/api/v1/health")).header("Host", "evil.example:8080"))
+        .andExpect(status().is(421));
+    mvc.perform(get("/ui/networks").header("Host", "rebind.attacker.test"))
+        .andExpect(status().is(421));
+    mvc.perform(authorized(get("/api/v1/health")).header("Host", "127.0.0.1:8080"))
+        .andExpect(status().isOk());
+    mvc.perform(get("/ui/networks").header("Host", "[::1]:8080")).andExpect(status().isOk());
   }
 
   @Test

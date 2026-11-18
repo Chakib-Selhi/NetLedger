@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -14,7 +15,13 @@ class ConfigTest {
 
   private static NetLedgerProperties properties(String token) {
     return new NetLedgerProperties(
-        Path.of("data"), token, 1000, Duration.ofMinutes(5), Duration.ofDays(30), null);
+        Path.of("data"),
+        token,
+        1000,
+        Duration.ofMinutes(5),
+        Duration.ofDays(30),
+        null,
+        List.of("127.0.0.1"));
   }
 
   @Test

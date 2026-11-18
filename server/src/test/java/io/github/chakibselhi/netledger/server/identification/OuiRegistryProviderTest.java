@@ -17,6 +17,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -75,7 +76,8 @@ class OuiRegistryProviderTest {
             1000,
             Duration.ofMinutes(5),
             Duration.ofDays(30),
-            new NetLedgerProperties.Oui(bundled, updates, Duration.ofDays(30), base));
+            new NetLedgerProperties.Oui(bundled, updates, Duration.ofDays(30), base),
+            List.of("127.0.0.1"));
     return new OuiRegistryProvider(properties, Clock.fixed(NOW, ZoneOffset.UTC));
   }
 

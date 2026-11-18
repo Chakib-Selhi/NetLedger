@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Supplier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -69,12 +70,36 @@ public class CorrelationEngine {
   }
 
   public IngestResult ingest(long networkId, List<Observation> observations) {
+    return exclusive(() -> apply(networkId, observations));
+  }
+
+  /** Runs a change in one transaction, never at the same time as a batch being applied. */
+  <T> T exclusive(Supplier<T> change) {
     writer.lock();
     try {
-      return transaction.execute(status -> apply(networkId, observations));
+      return transaction.execute(status -> change.get());
     } finally {
       writer.unlock();
     }
+  }
+
+  /** Guesses the type again from what is stored, after a merge. */
+  void reclassify(long deviceId) {
+    devices
+        .findById(deviceId)
+        .ifPresent(
+            row ->
+                devices.setGuessedType(
+                    deviceId,
+                    typeRules
+                        .guess(
+                            new DeviceFacts(
+                                devices.serviceTypes(deviceId, false),
+                                devices.serviceTypes(deviceId, true),
+                                row.dhcpFingerprint(),
+                                row.randomized(),
+                                row.vendor()))
+                        .value()));
   }
 
   private IngestResult apply(long networkId, List<Observation> observations) {

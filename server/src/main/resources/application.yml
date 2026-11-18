@@ -22,6 +22,14 @@ server:
   error:
     include-message: never
     include-stacktrace: never
+  servlet:
+    session:
+      # The session only holds the dashboard's CSRF token.
+      timeout: 12h
+      cookie:
+        http-only: true
+        same-site: strict
+        name: NETLEDGER_SESSION
 
 netledger:
   data-dir: ${NETLEDGER_DATA_DIR:./data}

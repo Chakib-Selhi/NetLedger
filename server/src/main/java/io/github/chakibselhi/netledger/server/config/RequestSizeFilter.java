@@ -15,7 +15,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * unknown length, so a client cannot exhaust memory with one huge JSON document.
  */
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE)
+@Order(Ordered.HIGHEST_PRECEDENCE + 1)
 class RequestSizeFilter extends OncePerRequestFilter {
 
   static final long MAX_BODY_BYTES = 2L * 1024 * 1024;
@@ -24,7 +24,10 @@ class RequestSizeFilter extends OncePerRequestFilter {
   protected void doFilterInternal(
       HttpServletRequest request, HttpServletResponse response, FilterChain chain)
       throws ServletException, IOException {
-    boolean hasBody = "POST".equals(request.getMethod()) || "PUT".equals(request.getMethod());
+    boolean hasBody =
+        "POST".equals(request.getMethod())
+            || "PUT".equals(request.getMethod())
+            || "PATCH".equals(request.getMethod());
     long length = request.getContentLengthLong();
     if (hasBody && length < 0) {
       response.setStatus(HttpServletResponse.SC_LENGTH_REQUIRED);
