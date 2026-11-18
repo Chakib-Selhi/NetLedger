@@ -88,6 +88,7 @@ public final class AgentMain {
                 config.serverUrl(),
                 token,
                 alert -> {
+                  log.info("Alert {}: {} — {}", alert.kind(), alert.title(), alert.message());
                   recent.add(alert);
                   notifier.accept(alert);
                 })
