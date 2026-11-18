@@ -1,6 +1,7 @@
 package io.github.chakibselhi.netledger.server.api;
 
 import io.github.chakibselhi.netledger.core.model.ObservationBatch;
+import io.github.chakibselhi.netledger.server.alerting.AlertBroadcaster;
 import io.github.chakibselhi.netledger.server.config.NetLedgerProperties;
 import io.github.chakibselhi.netledger.server.correlation.CorrelationEngine;
 import io.github.chakibselhi.netledger.server.correlation.IngestResult;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /** Routes used by the native agent. All require the shared token (see SecurityConfig). */
 @RestController
@@ -35,6 +37,7 @@ class AgentApiController {
   private final NetworkService networkService;
   private final NetworkRepository networks;
   private final CorrelationEngine correlation;
+  private final AlertBroadcaster alerts;
   private final int maxBatchSize;
   private final Clock clock;
 
@@ -42,11 +45,13 @@ class AgentApiController {
       NetworkService networkService,
       NetworkRepository networks,
       CorrelationEngine correlation,
+      AlertBroadcaster alerts,
       NetLedgerProperties properties,
       Clock clock) {
     this.networkService = networkService;
     this.networks = networks;
     this.correlation = correlation;
+    this.alerts = alerts;
     this.maxBatchSize = properties.maxBatchSize();
     this.clock = clock;
   }
@@ -54,6 +59,12 @@ class AgentApiController {
   @GetMapping("/health")
   Health health() {
     return new Health("UP", clock.instant());
+  }
+
+  /** Server-Sent Events stream of alerts for the agent to display (EF-12). */
+  @GetMapping(path = "/alerts/stream", produces = "text/event-stream")
+  SseEmitter alertStream() {
+    return alerts.connect();
   }
 
   @PostMapping("/networks/current")

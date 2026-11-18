@@ -1,5 +1,6 @@
 package io.github.chakibselhi.netledger.server.config;
 
+import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -32,7 +33,13 @@ class SecurityConfig {
         .formLogin(AbstractHttpConfigurer::disable)
         .addFilterBefore(
             new AgentTokenFilter(properties.agentToken()), BasicAuthenticationFilter.class)
-        .authorizeHttpRequests(a -> a.anyRequest().hasRole("AGENT"))
+        // The SSE stream completes on an async dispatch, after the request was authenticated.
+        .authorizeHttpRequests(
+            a ->
+                a.dispatcherTypeMatchers(DispatcherType.ASYNC)
+                    .permitAll()
+                    .anyRequest()
+                    .hasRole("AGENT"))
         .exceptionHandling(
             e -> e.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
         .build();
