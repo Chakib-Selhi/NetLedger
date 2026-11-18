@@ -8,6 +8,24 @@ spring:
       maximum-pool-size: 4
   flyway:
     locations: classpath:db/migration
+  mvc:
+    problemdetails:
+      enabled: true
+  jackson:
+    time-zone: UTC
+
+server:
+  # Loopback only when run directly; the Docker image binds 0.0.0.0 inside the container and
+  # docker-compose publishes the port on 127.0.0.1 only.
+  address: ${NETLEDGER_BIND_ADDRESS:127.0.0.1}
+  port: 8080
+  error:
+    include-message: never
+    include-stacktrace: never
 
 netledger:
-  data-dir: ./data
+  data-dir: ${NETLEDGER_DATA_DIR:./data}
+  agent-token: ${NETLEDGER_AGENT_TOKEN:}
+  oui:
+    bundled-dir: ${NETLEDGER_OUI_DIR:}
+    update-enabled: ${NETLEDGER_OUI_UPDATE:false}

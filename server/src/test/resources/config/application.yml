@@ -1,0 +1,6 @@
+# Test overrides, loaded on top of src/main/resources/application.yml.
+netledger:
+  data-dir: ${java.io.tmpdir}/netledger-test/${random.uuid}
+  agent-token: test-token-0123456789abcdef0123456789abcdef
+  oui:
+    bundled-dir: src/test/resources/oui
