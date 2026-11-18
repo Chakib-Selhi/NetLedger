@@ -1,6 +1,8 @@
 package io.github.chakibselhi.netledger.agent.capture;
 
+import java.io.EOFException;
 import java.io.IOException;
+import java.util.concurrent.TimeoutException;
 import org.pcap4j.core.BpfProgram.BpfCompileMode;
 import org.pcap4j.core.NotOpenException;
 import org.pcap4j.core.PcapHandle;
@@ -42,10 +44,19 @@ public final class PcapPacketSource implements PacketSource {
           nif.openLive(SNAPLEN, PromiscuousMode.NONPROMISCUOUS, READ_TIMEOUT_MILLIS)) {
         handle.setFilter(FILTER, BpfCompileMode.OPTIMIZE);
         while (running) {
-          byte[] frame = handle.getNextRawPacket();
-          if (frame != null) {
-            handler.onFrame(handle.getTimestamp().toInstant(), frame);
+          byte[] frame;
+          try {
+            // pcap_next_ex, not pcap_next: on macOS, Apple's libpcap appends a 256-byte comment
+            // field to struct pcap_pkthdr. pcap_next copies that larger header into the 24-byte
+            // buffer pcap4j allocates, overflowing the heap on every packet. pcap_next_ex only
+            // hands back a pointer to libpcap's own header.
+            frame = handle.getNextRawPacketEx();
+          } catch (TimeoutException e) {
+            continue;
+          } catch (EOFException e) {
+            return;
           }
+          handler.onFrame(handle.getTimestamp().toInstant(), frame);
         }
       }
     } catch (PcapNativeException | NotOpenException e) {

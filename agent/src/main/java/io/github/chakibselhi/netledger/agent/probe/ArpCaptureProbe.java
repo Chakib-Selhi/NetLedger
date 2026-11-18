@@ -88,9 +88,14 @@ public final class ArpCaptureProbe {
       handle.setFilter("arp", BpfCompileMode.OPTIMIZE);
       Instant deadline = Instant.now().plus(duration);
       while (Instant.now().isBefore(deadline)) {
-        Packet packet = handle.getNextPacket();
-        if (packet == null) {
+        Packet packet;
+        try {
+          // getNextPacketEx (pcap_next_ex): pcap_next overflows pcap4j's header buffer on macOS.
+          packet = handle.getNextPacketEx();
+        } catch (java.util.concurrent.TimeoutException e) {
           continue;
+        } catch (java.io.EOFException e) {
+          break;
         }
         ArpPacket arp = packet.get(ArpPacket.class);
         if (arp != null) {
