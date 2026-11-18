@@ -291,6 +291,24 @@ class AgentTest {
   }
 
   @Test
+  void pauseStopsCaptureUntilResumed() throws Exception {
+    Agent agent = agent(false);
+    agent.tick();
+    awaitReplay();
+
+    agent.setPaused(true);
+    clock.advance(Duration.ofMinutes(10));
+    agent.tick();
+    assertThat(agent.status().capturing()).isFalse();
+    assertThat(agent.status().paused()).isTrue();
+
+    agent.setPaused(false);
+    agent.tick();
+    assertThat(agent.status().capturing()).isTrue();
+    assertThat(sessions).hasSize(2);
+  }
+
+  @Test
   void describesItsStatus() {
     Agent agent = agent(false);
     agent.tick();

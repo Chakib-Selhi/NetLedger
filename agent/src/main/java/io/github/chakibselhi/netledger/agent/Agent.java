@@ -78,6 +78,7 @@ public final class Agent {
   private CaptureSession capture;
   private long sent;
   private boolean serverReachable;
+  private boolean paused;
 
   public Agent(
       AgentConfig config,
@@ -140,7 +141,24 @@ public final class Agent {
 
   public synchronized Status status() {
     return new Status(
-        network, decision, capturing(), buffer.size(), sent, buffer.dropped(), serverReachable);
+        network,
+        decision,
+        capturing(),
+        paused,
+        buffer.size(),
+        sent,
+        buffer.dropped(),
+        serverReachable);
+  }
+
+  /** Pause from the menu bar: capture stops until resumed; uploads continue. */
+  public synchronized void setPaused(boolean pause) {
+    paused = pause;
+    if (pause) {
+      stopCapture();
+    } else {
+      lastDeclare = null;
+    }
   }
 
   /** Snapshot for logs and, later, the menu bar. */
@@ -148,6 +166,7 @@ public final class Agent {
       NetworkIdentity network,
       NetworkDecision decision,
       boolean capturing,
+      boolean paused,
       int buffered,
       long sent,
       long dropped,
@@ -184,7 +203,7 @@ public final class Agent {
               || decision.networkId() != answer.networkId()
               || decision.capture() != answer.capture();
       decision = answer;
-      if (answer.capture() && !capturing()) {
+      if (answer.capture() && !capturing() && !paused) {
         log.info(
             "Network {} is {}: capture starts on {}",
             answer.networkId(),

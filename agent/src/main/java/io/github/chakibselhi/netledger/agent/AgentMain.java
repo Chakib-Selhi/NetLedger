@@ -1,5 +1,8 @@
 package io.github.chakibselhi.netledger.agent;
 
+import io.github.chakibselhi.netledger.agent.alerts.AlertStreamClient;
+import io.github.chakibselhi.netledger.agent.alerts.OsascriptNotifier;
+import io.github.chakibselhi.netledger.agent.alerts.RecentAlerts;
 import io.github.chakibselhi.netledger.agent.buffer.ObservationBuffer;
 import io.github.chakibselhi.netledger.agent.capture.CaptureSession;
 import io.github.chakibselhi.netledger.agent.capture.PcapPacketSource;
@@ -10,10 +13,16 @@ import io.github.chakibselhi.netledger.agent.network.NetworkDetector;
 import io.github.chakibselhi.netledger.agent.scan.ArpScanner;
 import io.github.chakibselhi.netledger.agent.scan.PcapFrameSender;
 import io.github.chakibselhi.netledger.agent.server.ServerClient;
+import io.github.chakibselhi.netledger.agent.system.CommandRunner;
 import io.github.chakibselhi.netledger.agent.system.ProcessCommandRunner;
+import io.github.chakibselhi.netledger.agent.ui.TrayMenu;
+import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.ZoneId;
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
@@ -27,6 +36,8 @@ public final class AgentMain {
   private AgentMain() {}
 
   public static void main(String[] args) throws Exception {
+    // A menu bar agent: no Dock icon, no application menu.
+    System.setProperty("apple.awt.UIElement", "true");
     Path configFile = args.length > 0 ? Path.of(args[0]) : AgentConfig.defaultFile();
     AgentConfig config = AgentConfig.load(configFile);
     var commands = new ProcessCommandRunner(Duration.ofSeconds(5));
@@ -58,7 +69,10 @@ public final class AgentMain {
                         target,
                         network.interfaceName())
                     .start(),
-            (network, decision) -> querier.queryServiceTypes(network.localIp()),
+            (network, decision) -> {
+              querier.queryServiceTypes(network.localIp());
+              querier.queryIdentifyingInstances(network.localIp());
+            },
             (network, decision) -> {
               byte[] localMac =
                   java.net.NetworkInterface.getByName(network.interfaceName()).getHardwareAddress();
@@ -67,6 +81,29 @@ public final class AgentMain {
             },
             Clock.systemUTC());
 
+    var recent = new RecentAlerts(5);
+    var notifier = new OsascriptNotifier(commands, ZoneId.systemDefault());
+    var alerts =
+        new AlertStreamClient(
+                config.serverUrl(),
+                token,
+                alert -> {
+                  recent.add(alert);
+                  notifier.accept(alert);
+                })
+            .start();
+    if (TrayMenu.supported()) {
+      new TrayMenu(
+              agent::status,
+              alerts::connected,
+              recent,
+              agent::setPaused,
+              path -> open(config.serverUrl(), path, commands),
+              AgentMain::quit)
+          .install();
+    } else {
+      log.info("No menu bar available: running headless");
+    }
     log.info("NetLedger agent started; server {}", config.serverUrl());
     var scheduler =
         Executors.newSingleThreadScheduledExecutor(
@@ -93,6 +130,22 @@ public final class AgentMain {
                   log.info("NetLedger agent stopped");
                 }));
     Thread.currentThread().join();
+  }
+
+  /** Opens a dashboard page in the default browser; only paths of the configured server. */
+  static void open(URI server, String path, CommandRunner commands) {
+    String base = server.toString().replaceAll("/+$", "");
+    try {
+      commands.run(List.of("open", base + path));
+    } catch (IOException e) {
+      log.warn("Cannot open the dashboard: {}", e.getMessage());
+    }
+  }
+
+  /** Quitting runs the shutdown hook, which stops capture and sends what is left. */
+  private static void quit() {
+    // Called on the AWT event thread: exiting from another thread lets the hook run unhindered.
+    Thread.ofPlatform().start(() -> System.exit(0));
   }
 
   static String describe(Agent.Status s) {
