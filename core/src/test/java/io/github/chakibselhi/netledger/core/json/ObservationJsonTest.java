@@ -17,6 +17,7 @@ class ObservationJsonTest {
 
   private final ObservationBatch batch =
       new ObservationBatch(
+          7,
           List.of(
               Observation.presence(T, ObservationSource.ARP_SCAN, "a4:83:e7:12:34:56", "10.0.0.2"),
               new Observation(
@@ -44,6 +45,7 @@ class ObservationJsonTest {
         .contains("\"observedAt\":\"2026-11-17T12:00:00.250Z\"")
         .contains("\"source\":\"arp_scan\"")
         .contains("\"source\":\"mdns\"")
+        .contains("\"networkId\":7")
         .doesNotContain("null")
         .doesNotContain("vendorClass");
   }
@@ -51,7 +53,7 @@ class ObservationJsonTest {
   @Test
   void ignoresUnknownFieldsFromNewerAgents() {
     String json =
-        "{\"observations\":[{\"observedAt\":\"2026-11-17T12:00:00Z\",\"source\":\"arp\","
+        "{\"networkId\":1,\"observations\":[{\"observedAt\":\"2026-11-17T12:00:00Z\",\"source\":\"arp\","
             + "\"mac\":\"a4:83:e7:12:34:56\",\"futureField\":42}],\"agentVersion\":\"2.0\"}";
 
     assertThat(ObservationJson.read(json).observations())

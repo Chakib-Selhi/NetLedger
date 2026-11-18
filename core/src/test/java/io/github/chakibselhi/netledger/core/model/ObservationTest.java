@@ -41,7 +41,7 @@ class ObservationTest {
                     T, ObservationSource.MDNS, "a4:83:e7:12:34:56", null, null, null, null, null)
                 .services())
         .isEmpty();
-    assertThat(new ObservationBatch(null).observations()).isEmpty();
+    assertThat(new ObservationBatch(1, null).observations()).isEmpty();
   }
 
   @Test
