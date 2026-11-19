@@ -49,7 +49,15 @@ codesign --verify --strict "$APP/Contents/runtime/Contents/Home/bin/java"
 codesign --force --sign - "$APP"
 codesign --verify --deep --strict "$APP"
 
-"$JDK/bin/jpackage" --type dmg --dest "$OUT" --app-image "$APP" \
-  --name NetLedger --app-version "$VERSION"
+# Not jpackage --type dmg: it signs the app image again (ad hoc, --deep), which replaces the
+# vendor signature of bin/java. hdiutil copies the app as it is.
+STAGE="$OUT/dmg-stage"
+rm -rf "$STAGE"
+mkdir -p "$STAGE"
+cp -R "$APP" "$STAGE/"
+ln -s /Applications "$STAGE/Applications"
+hdiutil create -quiet -volname NetLedger -srcfolder "$STAGE" -ov -format UDZO \
+  "$OUT/NetLedger-$VERSION.dmg"
+rm -rf "$STAGE"
 
 echo "Built $APP and $OUT/NetLedger-$VERSION.dmg"
