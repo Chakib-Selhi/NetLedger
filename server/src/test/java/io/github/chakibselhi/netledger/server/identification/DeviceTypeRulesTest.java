@@ -37,6 +37,14 @@ class DeviceTypeRulesTest {
   void castTargetWithoutCompanionLinkIsATv() {
     assertThat(guess(Set.of("_googlecast._tcp"), null, false, null)).isEqualTo(DeviceType.TV);
     assertThat(guess(Set.of("_airplay._tcp"), null, false, null)).isEqualTo(DeviceType.TV);
+    assertThat(
+            guess(
+                Set.of("_airplay._tcp", "_raop._tcp", "_companion-link._tcp", "_sleep-proxy._udp"),
+                null,
+                false,
+                "Apple, Inc."))
+        .as("an Apple TV is a sleep proxy, a Mac is not")
+        .isEqualTo(DeviceType.TV);
     assertThat(guess(Set.of("_airplay._tcp", "_companion-link._tcp"), null, false, null))
         .isEqualTo(DeviceType.UNKNOWN);
   }

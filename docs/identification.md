@@ -41,7 +41,13 @@ Rules are evaluated in this order; the first match wins.
 | 6 | Nothing above | `unknown` |
 
 Rule 2 excludes `_companion-link` because Apple phones, tablets and Macs announce it next to
-AirPlay, while Apple TVs and AirPlay speakers are the targets of a cast.
+AirPlay, while Apple TVs and AirPlay speakers are the targets of a cast. An Apple TV announces
+`_companion-link` too, but it is also a Bonjour sleep proxy (`_sleep-proxy._udp`), which Macs
+and phones are not: observed on a real Apple TV announcing `_airplay`, `_raop`,
+`_companion-link` and `_sleep-proxy`. An Apple TV announces
+`_companion-link` too, but it is also a Bonjour sleep proxy (`_sleep-proxy._udp`), which Macs
+and phones are not: observed on a real Apple TV announcing `_airplay`, `_raop`,
+`_companion-link` and `_sleep-proxy`.
 
 ### Proxies
 

@@ -59,7 +59,7 @@ public class DeviceTypeRules {
       return DeviceType.PRINTER;
     }
     if ((services.contains("_googlecast") || services.contains("_airplay"))
-        && !services.contains("_companion-link")) {
+        && (!services.contains("_companion-link") || services.contains("_sleep-proxy"))) {
       return DeviceType.TV;
     }
     if (os.filter(MOBILE_OS::contains).isPresent() && facts.randomizedMac()) {
