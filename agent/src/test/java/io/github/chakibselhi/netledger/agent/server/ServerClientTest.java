@@ -82,9 +82,15 @@ class ServerClientTest {
   @Test
   void healthAndUnreachableServer() throws Exception {
     assertThat(client.healthy()).isTrue();
+    assertThat(client.health()).isEqualTo(ServerClient.Health.UP);
+    server.healthStatus = 401;
+    assertThat(client.health()).isEqualTo(ServerClient.Health.TOKEN_REFUSED);
+    server.healthStatus = 503;
+    assertThat(client.health()).isEqualTo(ServerClient.Health.UNREACHABLE);
     var down = new ServerClient(URI.create("http://127.0.0.1:1/"), "t", Duration.ofMillis(500));
 
     assertThat(down.healthy()).isFalse();
+    assertThat(down.health()).isEqualTo(ServerClient.Health.UNREACHABLE);
     assertThatThrownBy(() -> down.declare(HOME))
         .isInstanceOfSatisfying(
             ServerException.class, e -> assertThat(e.reason()).isEqualTo(Reason.UNAVAILABLE));

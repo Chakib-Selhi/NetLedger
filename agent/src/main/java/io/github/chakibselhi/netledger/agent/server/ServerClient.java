@@ -32,13 +32,29 @@ public final class ServerClient {
     this.http = HttpClient.newBuilder().connectTimeout(timeout).build();
   }
 
-  public boolean healthy() {
+  /** Result of the health route, for the setup assistant. */
+  public enum Health {
+    UP,
+    TOKEN_REFUSED,
+    UNREACHABLE
+  }
+
+  public Health health() {
     try {
-      return send(HttpRequest.newBuilder(baseUrl.resolve("api/v1/health")).GET()).statusCode()
-          == 200;
+      int status =
+          send(HttpRequest.newBuilder(baseUrl.resolve("api/v1/health")).GET()).statusCode();
+      return switch (status) {
+        case 200 -> Health.UP;
+        case 401 -> Health.TOKEN_REFUSED;
+        default -> Health.UNREACHABLE;
+      };
     } catch (ServerException e) {
-      return false;
+      return Health.UNREACHABLE;
     }
+  }
+
+  public boolean healthy() {
+    return health() == Health.UP;
   }
 
   /** Declares the current network; the answer says whether capture is allowed. */

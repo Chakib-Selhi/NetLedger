@@ -15,6 +15,7 @@ public final class FakeServer implements AutoCloseable {
 
   public final List<Request> requests = new CopyOnWriteArrayList<>();
   public volatile int declareStatus = 200;
+  public volatile int healthStatus = 200;
   public volatile String trust = "owned";
   public volatile long networkId = 7;
   public volatile int observationsStatus = 200;
@@ -38,7 +39,7 @@ public final class FakeServer implements AutoCloseable {
           String answer = "";
           switch (path) {
             case "/api/v1/health" -> {
-              status = 200;
+              status = healthStatus;
               answer = "{\"status\":\"UP\"}";
             }
             case "/api/v1/networks/current" -> {

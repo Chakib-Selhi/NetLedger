@@ -28,6 +28,7 @@ public final class TrayMenu {
   private final RecentAlerts recent;
   private final Consumer<Boolean> pause;
   private final Consumer<String> openDashboard;
+  private final Runnable setup;
   private final Runnable quit;
   private final Map<MenuModel.State, BufferedImage> icons = new EnumMap<>(MenuModel.State.class);
 
@@ -46,7 +47,9 @@ public final class TrayMenu {
       RecentAlerts recent,
       Consumer<Boolean> pause,
       Consumer<String> openDashboard,
+      Runnable setup,
       Runnable quit) {
+    this.setup = setup;
     this.status = status;
     this.alertsConnected = alertsConnected;
     this.recent = recent;
@@ -74,6 +77,9 @@ public final class TrayMenu {
     dashboard.addActionListener(e -> openDashboard.accept("/"));
     menu.add(dashboard);
     menu.add(alerts);
+    var check = new MenuItem("Vérifier l'installation");
+    check.addActionListener(e -> setup.run());
+    menu.add(check);
     menu.addSeparator();
     var exit = new MenuItem("Quitter NetLedger");
     exit.addActionListener(e -> quit.run());

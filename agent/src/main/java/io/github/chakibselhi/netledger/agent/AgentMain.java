@@ -13,11 +13,14 @@ import io.github.chakibselhi.netledger.agent.network.NetworkDetector;
 import io.github.chakibselhi.netledger.agent.scan.ArpScanner;
 import io.github.chakibselhi.netledger.agent.scan.PcapFrameSender;
 import io.github.chakibselhi.netledger.agent.server.ServerClient;
+import io.github.chakibselhi.netledger.agent.setup.SetupChecks;
 import io.github.chakibselhi.netledger.agent.system.CommandRunner;
 import io.github.chakibselhi.netledger.agent.system.ProcessCommandRunner;
+import io.github.chakibselhi.netledger.agent.ui.SetupWindow;
 import io.github.chakibselhi.netledger.agent.ui.TrayMenu;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
@@ -28,7 +31,7 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Command-line entry point of the agent (the menu bar app comes in phase 4). */
+/** Entry point of the agent: setup checks, then capture, alerts and the menu bar icon. */
 public final class AgentMain {
 
   private static final Logger log = LoggerFactory.getLogger(AgentMain.class);
@@ -41,13 +44,23 @@ public final class AgentMain {
     Path configFile = args.length > 0 ? Path.of(args[0]) : AgentConfig.defaultFile();
     AgentConfig config = AgentConfig.load(configFile);
     var commands = new ProcessCommandRunner(Duration.ofSeconds(5));
+    var keychain = new KeychainTokenStore(commands);
+    var setup =
+        new SetupChecks(
+            () -> Files.isReadable(Path.of("/dev/bpf0")),
+            keychain::read,
+            t -> new ServerClient(config.serverUrl(), t, Duration.ofSeconds(3)).health());
+    List<SetupChecks.Check> checks = setup.run();
+    if (!SetupChecks.ready(checks)) {
+      if (!TrayMenu.supported()) {
+        throw new IllegalStateException("Setup incomplete: " + checks);
+      }
+      if (!SetupWindow.awaitReady(setup, checks)) {
+        System.exit(0);
+      }
+    }
     String token =
-        new KeychainTokenStore(commands)
-            .read()
-            .orElseThrow(
-                () ->
-                    new IllegalStateException(
-                        "No token in the keychain: run scripts/install-agent-token.sh"));
+        keychain.read().orElseThrow(() -> new IllegalStateException("No token in the keychain"));
 
     var server = new ServerClient(config.serverUrl(), token, Duration.ofSeconds(10));
     var detector =
@@ -100,6 +113,7 @@ public final class AgentMain {
               recent,
               agent::setPaused,
               path -> open(config.serverUrl(), path, commands),
+              () -> SetupWindow.show(setup),
               AgentMain::quit)
           .install();
     } else {
