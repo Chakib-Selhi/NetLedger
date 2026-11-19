@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds and runs the agent from the terminal (the menu bar app comes in phase 4).
+# Builds and runs the agent from the terminal, for development (scripts/package-agent.sh builds the app).
 # Needs read access to /dev/bpf* (brew install --cask wireshark-chmodbpf).
 set -euo pipefail
 
