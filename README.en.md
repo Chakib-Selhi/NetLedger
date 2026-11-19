@@ -85,11 +85,25 @@ Requirements: an Apple Silicon Mac on macOS 13 or later, Docker Desktop, and a J
    ```
 3. **Token in the keychain**: `./scripts/install-agent-token.sh` (paste the token from `.env`).
 4. **Agent**: `./scripts/package-agent.sh` builds `agent/target/dist/NetLedger-1.0.0.dmg`. Open it and drag NetLedger to Applications.
-5. **First launch**: the app is only signed locally (no paid Apple developer account), so Gatekeeper blocks it. Open **System Settings › Privacy & Security** and click **Open Anyway**. macOS may also ask for local network access, used by the mDNS query.
-6. **Assistant**: at launch, NetLedger checks BPF access, the token and the server, and explains what to do when something is missing. Reopen it with **Vérifier l'installation** in the menu.
+5. **Launch**: open NetLedger. No window opens: the app starts the agent as a per-user `launchd` service (no administrator rights), and a dot appears in the menu bar. **Quitter NetLedger** in that menu stops the agent until NetLedger is opened again; nothing starts by itself at login. macOS may ask whether "java" may access the local network: it is used by the mDNS query. An app built on your Mac is not blocked by Gatekeeper; a downloaded `.dmg` is, then click **Open Anyway** in **System Settings › Privacy & Security**.
+6. **Assistant**: at launch, the agent checks BPF access, local network access, the token and the server, and explains what to do when something is missing. Reopen it with **Vérifier l'installation** in the menu. Agent log: `~/Library/Logs/NetLedger/agent.log`.
 7. **Network status**: open [http://127.0.0.1:8080](http://127.0.0.1:8080) and choose the current network's status. Without an answer, nothing is captured. The first 24 hours of monitoring are a learning period, without device alerts.
 
 To try the dashboard without a network or an agent: `./scripts/demo.sh start`, then [http://127.0.0.1:8081](http://127.0.0.1:8081).
+
+**Uninstall**: quit NetLedger from its menu, then:
+
+```bash
+launchctl bootout gui/$(id -u)/io.github.chakibselhi.netledger.agent
+rm ~/Library/LaunchAgents/io.github.chakibselhi.netledger.agent.plist
+rm -r /Applications/NetLedger.app ~/Library/Logs/NetLedger "$HOME/Library/Application Support/NetLedger"
+security delete-generic-password -s NetLedger -a agent
+docker compose down -v
+```
+
+### Why the app goes through `launchd`
+
+Since macOS 15, the system hides the local network from programs it has not allowed: run by the app, `arp` answered "no entry" for the router although the entry existed. Tests showed the hiding targeted executables signed only locally ("ad hoc"), and that the "Local Network" switch in System Settings did not lift it for them. The JDK's `java` launcher, signed by its vendor (Adoptium), is not affected. So the app bundles that original `java` and has `launchd` start it, outside the app's identity. The packaging script keeps that signature: it only re-signs the app's outer bundle and builds the `.dmg` with `hdiutil`, because `jpackage --type dmg` replaced it.
 
 ## Development
 
