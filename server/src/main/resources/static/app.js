@@ -9,13 +9,20 @@ const TRUST = {
   authorized: "Réseau autorisé",
   ignored: "Ne pas surveiller",
 };
-const STATUS = {
-  new: "Nouveau",
-  approved: "Approuvé",
-  guest: "Invité",
-  suspect: "Suspect",
-  ignored: "Ignoré",
+const VISA = {
+  new: "à viser",
+  approved: "approuvé",
+  guest: "invité",
+  suspect: "suspect",
+  ignored: "ignoré",
 };
+const STAMPS = [
+  ["approved", "Approuvé"],
+  ["guest", "Invité"],
+  ["suspect", "Suspect"],
+  ["ignored", "Ignoré"],
+  ["new", "À viser"],
+];
 const TYPE = {
   phone: "Téléphone",
   computer: "Ordinateur",
@@ -39,7 +46,7 @@ function el(tag, attrs, ...children) {
     else if (key === "class") node.className = value;
     else node.setAttribute(key, value === true ? "" : String(value));
   }
-  for (const child of children.flat()) {
+  for (const child of children.flat(Infinity)) {
     if (child === undefined || child === null || child === false) continue;
     node.append(child instanceof Node ? child : document.createTextNode(String(child)));
   }
@@ -50,12 +57,20 @@ function link(path, ...children) {
   return el("a", { href: path, "data-link": true }, ...children);
 }
 
-function chip(text, kind) {
-  return el("span", { class: "chip " + (kind || "") }, text);
+function textButton(label, onclick, danger) {
+  return el("button", { type: "button", class: "textbtn" + (danger ? " danger" : ""), onclick }, label);
+}
+
+function visa(status) {
+  return el("span", { class: "visa " + status }, VISA[status] || status);
+}
+
+function mono(text) {
+  return el("span", { class: "mono" }, text);
 }
 
 function show(...nodes) {
-  view.replaceChildren(...nodes);
+  view.replaceChildren(...nodes.flat(Infinity).filter((n) => n !== null && n !== undefined && n !== false));
 }
 
 let toastTimer;
@@ -70,11 +85,13 @@ function toast(message, error) {
 
 // --- Formatting --------------------------------------------------------------------------
 
-const dateFormat = new Intl.DateTimeFormat("fr-CA", { dateStyle: "medium", timeStyle: "short" });
+const dateTime = new Intl.DateTimeFormat("fr-CA", { dateStyle: "medium", timeStyle: "short" });
+const shortDate = new Intl.DateTimeFormat("fr-CA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const dayTitle = new Intl.DateTimeFormat("fr-CA", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+const clock = new Intl.DateTimeFormat("fr-CA", { hour: "2-digit", minute: "2-digit" });
 
-function when(iso) {
-  return iso ? dateFormat.format(new Date(iso)) : "—";
-}
+const when = (iso) => (iso ? dateTime.format(new Date(iso)) : "—");
+const short = (iso) => (iso ? shortDate.format(new Date(iso)) : "—");
 
 function ago(iso) {
   if (!iso) return "—";
@@ -86,24 +103,23 @@ function ago(iso) {
   return `il y a ${Math.round(hours / 24)} j`;
 }
 
-function deviceName(d) {
-  return d.displayName || d.hostname || vendorOf(d) || d.mac;
-}
-
-function vendorOf(d) {
-  return d.randomized ? "Adresse privée" : d.vendor || "";
-}
-
-function networkName(n) {
-  return n.label || n.subnet;
-}
+const pad = (n, width) => String(n).padStart(width, "0");
+const vendorOf = (d) => (d.randomized ? "Adresse privée" : d.vendor || "");
+const deviceName = (d) => d.displayName || d.hostname || vendorOf(d) || d.mac;
+const networkName = (n) => n.label || n.subnet;
 
 function monitoring(n) {
-  if (n.trust !== "owned" && n.trust !== "authorized") return "Non surveillé";
+  if (n.trust !== "owned" && n.trust !== "authorized") return "Rien n'est capturé sur ce réseau.";
   if (n.learningUntil && new Date(n.learningUntil) > new Date()) {
-    return `Surveillé · apprentissage jusqu'au ${when(n.learningUntil)} (pas d'alerte d'appareil)`;
+    return `Surveillé. Apprentissage jusqu'au ${when(n.learningUntil)} : pas d'alerte d'appareil d'ici là.`;
   }
-  return "Surveillé";
+  return "Surveillé.";
+}
+
+/** Entry numbers in order of first appearance, like the lines of a ledger. */
+function entryNumbers(devices) {
+  const ordered = [...devices].sort((a, b) => a.firstSeen.localeCompare(b.firstSeen) || a.id - b.id);
+  return new Map(ordered.map((d, i) => [d.id, i + 1]));
 }
 
 // --- Server access -----------------------------------------------------------------------
@@ -160,33 +176,37 @@ async function run(action, success) {
   }
 }
 
-// --- Views -------------------------------------------------------------------------------
+// --- Registers (networks) ----------------------------------------------------------------
 
 async function networksView() {
   const networks = await api("GET", "/ui/networks");
-  document.title = "Réseaux · NetLedger";
+  document.title = "Registres · NetLedger";
+  const intro = el(
+    "p",
+    { class: "warning" },
+    "NetLedger ne capture rien sur un réseau tant que vous ne l'avez pas déclaré comme le vôtre, ou autorisé par son administrateur.",
+  );
   if (networks.length === 0) {
     return show(
-      el("h1", {}, "Réseaux"),
-      el("p", { class: "empty" }, "Aucun réseau. Lancez l'agent : le réseau courant apparaîtra ici."),
+      el("h1", {}, "Registres"),
+      intro,
+      el("p", { class: "empty" }, "Aucun réseau pour l'instant. Lancez l'agent : le réseau courant s'inscrira ici."),
     );
   }
   show(
-    el("h1", {}, "Réseaux"),
-    el(
-      "p",
-      { class: "sub" },
-      "NetLedger ne capture rien sur un réseau tant que vous ne l'avez pas déclaré comme le vôtre ou autorisé par son administrateur.",
-    ),
-    el("div", { class: "cards" }, networks.map(networkCard)),
+    el("p", { class: "folio" }, `${networks.length} registre(s)`),
+    el("h1", {}, "Registres"),
+    intro,
+    el("h2", { class: "section" }, "Réseaux rencontrés"),
+    el("div", { class: "entries" }, networks.map(networkEntry)),
   );
 }
 
-function networkCard(n) {
+function networkEntry(n) {
   const trust = el(
     "select",
     {
-      "aria-label": "Statut du réseau",
+      id: `trust-${n.id}`,
       onchange: async (e) => {
         const value = e.target.value;
         if (value === "authorized" && !confirm("Avez-vous l'accord de l'administrateur de ce réseau pour y surveiller les appareils ?")) {
@@ -201,62 +221,96 @@ function networkCard(n) {
     Object.entries(TRUST).map(([value, label]) => el("option", { value, selected: value === n.trust }, label)),
   );
   return el(
-    "div",
-    { class: "card" + (n.trust === "unset" ? " attention" : "") },
+    "section",
+    { class: "entry" + (n.trust === "unset" ? " pending" : "") },
+    el("div", { class: "num", "aria-label": `Folio ${n.id}` }, pad(n.id, 2)),
     el(
       "div",
-      { class: "card-head" },
+      {},
+      el("h3", {}, link(`/networks/${n.id}`, networkName(n))),
+      el("p", { class: "mono muted" }, `${n.subnet} · passerelle ${n.gatewayMac}`),
+      el("p", {}, monitoring(n)),
+      el(
+        "p",
+        { class: "muted" },
+        `${n.devices} inscription(s)`,
+        n.newDevices ? el("span", { class: "red" }, ` · ${n.newDevices} à viser`) : null,
+        ` · vu ${ago(n.lastSeen)}`,
+      ),
+      n.trust === "unset" ? el("p", { class: "red" }, "Choisissez un statut : rien n'est capturé d'ici là.") : null,
       el(
         "div",
-        {},
-        el("h3", {}, link(`/networks/${n.id}`, networkName(n))),
-        el("div", { class: "muted mono" }, `${n.subnet} · passerelle ${n.gatewayMac}`),
-      ),
-      trust,
-    ),
-    el("p", {}, monitoring(n)),
-    el(
-      "div",
-      { class: "muted" },
-      `${n.devices} appareil(s), dont ${n.newDevices} nouveau(x) · vu ${ago(n.lastSeen)}`,
-    ),
-    n.trust === "unset"
-      ? el("p", {}, "Choisissez son statut : sans réponse, rien n'est capturé sur ce réseau.")
-      : null,
-    el(
-      "div",
-      { class: "actions" },
-      link(`/networks/${n.id}`, "Appareils"),
-      link(`/events?network=${n.id}`, "Chronologie"),
-      el("a", { href: `/ui/networks/${n.id}/inventory.csv`, download: true }, "Export CSV"),
-      el("a", { href: `/ui/networks/${n.id}/inventory.json`, download: true }, "Export JSON"),
-      el(
-        "button",
-        {
-          type: "button",
-          onclick: async () => {
-            const label = prompt("Nom du réseau (vide pour effacer)", n.label || "");
-            if (label === null) return;
-            await run(() => api("PATCH", `/ui/networks/${n.id}`, { label }), "Nom enregistré");
+        { class: "actions" },
+        link(`/networks/${n.id}`, "Ouvrir le registre"),
+        link(`/events?network=${n.id}`, "Journal"),
+        el("a", { href: `/ui/networks/${n.id}/inventory.csv`, download: true }, "Export CSV"),
+        el("a", { href: `/ui/networks/${n.id}/inventory.json`, download: true }, "Export JSON"),
+        textButton("Renommer", async () => {
+          const label = prompt("Nom du registre (vide pour effacer)", n.label || "");
+          if (label === null) return;
+          await run(() => api("PATCH", `/ui/networks/${n.id}`, { label }), "Nom enregistré");
+          route();
+        }),
+        textButton(
+          "Supprimer",
+          async () => {
+            if (!confirm(`Supprimer « ${networkName(n)} » et tout son historique (${n.devices} inscription(s)) ? C'est définitif.`)) return;
+            await run(() => api("DELETE", `/ui/networks/${n.id}`), "Registre supprimé");
             route();
           },
-        },
-        "Renommer",
-      ),
-      el(
-        "button",
-        {
-          type: "button",
-          class: "danger",
-          onclick: async () => {
-            if (!confirm(`Supprimer « ${networkName(n)} » et tout son historique (${n.devices} appareil(s)) ? C'est définitif.`)) return;
-            await run(() => api("DELETE", `/ui/networks/${n.id}`), "Réseau supprimé");
-            route();
-          },
-        },
-        "Supprimer",
+          true,
+        ),
       ),
     ),
+    el("div", { class: "status" }, el("label", { for: `trust-${n.id}` }, "statut"), trust),
+  );
+}
+
+// --- One register: address plan and ledger ---------------------------------------------------
+
+const ipToInt = (ip) => ip.split(".").reduce((acc, part) => acc * 256 + Number(part), 0);
+const intToIp = (n) => [24, 16, 8, 0].map((shift) => Math.floor(n / 2 ** shift) % 256).join(".");
+
+/** One square per address, for subnets up to /22 (1024 addresses); null for larger ones. */
+function addressPlan(subnet, devices) {
+  const [base, bits] = subnet.split("/");
+  const prefix = Number(bits);
+  if (!(prefix >= 22 && prefix <= 30)) return null;
+  const start = ipToInt(base);
+  const size = 2 ** (32 - prefix);
+  const used = new Map();
+  for (const d of devices) {
+    if (!d.lastIp) continue;
+    const offset = ipToInt(d.lastIp) - start;
+    if (offset >= 0 && offset < size) used.set(offset, d);
+  }
+  const cells = [];
+  for (let i = 0; i < size; i++) {
+    const ip = intToIp(start + i);
+    const d = used.get(i);
+    cells.push(
+      d
+        ? el("a", { class: `cell ${d.status}`, href: `/devices/${d.id}`, "data-link": true, title: `${ip} · ${deviceName(d)} · ${VISA[d.status]}` })
+        : el("span", { class: "cell", title: `${ip} · libre` }),
+    );
+  }
+  const grid = el("div", { class: "grid" }, cells);
+  // Set through the CSSOM: the Content Security Policy forbids inline style attributes.
+  grid.style.gridTemplateColumns = `repeat(${Math.min(32, size)}, 1fr)`;
+  const legend = [
+    ["approved", "approuvé"],
+    ["guest", "invité"],
+    ["new", "à viser"],
+    ["suspect", "suspect"],
+    ["", "libre"],
+  ];
+  return el(
+    "div",
+    { class: "plan" },
+    el("h2", { class: "section" }, "Plan d'adressage"),
+    el("p", { class: "mono muted" }, `${intToIp(start)} → ${intToIp(start + size - 1)} · ${used.size} adresse(s) occupée(s) sur ${size}`),
+    grid,
+    el("div", { class: "legend" }, legend.map(([status, label]) => el("span", {}, el("span", { class: "cell " + status }), label))),
   );
 }
 
@@ -266,51 +320,61 @@ async function networkView(id) {
     api("GET", `/ui/networks/${id}/devices`),
   ]);
   document.title = `${networkName(network)} · NetLedger`;
-  const search = el("input", { type: "search", placeholder: "Nom, fabricant, IP ou MAC", "aria-label": "Rechercher" });
+  const numbers = entryNumbers(devices);
+  const search = el("input", { type: "search", placeholder: "nom, fabricant, IP ou MAC", "aria-label": "Rechercher" });
   const status = el(
     "select",
-    { "aria-label": "Filtrer par statut" },
-    el("option", { value: "" }, "Tous les statuts"),
-    Object.entries(STATUS).map(([value, label]) => el("option", { value }, label)),
+    { "aria-label": "Visa" },
+    el("option", { value: "" }, "tous les visas"),
+    Object.entries(VISA).map(([value, label]) => el("option", { value }, label)),
   );
   const type = el(
     "select",
-    { "aria-label": "Filtrer par type" },
-    el("option", { value: "" }, "Tous les types"),
-    Object.entries(TYPE).map(([value, label]) => el("option", { value }, label)),
+    { "aria-label": "Type" },
+    el("option", { value: "" }, "tous les types"),
+    Object.entries(TYPE).map(([value, label]) => el("option", { value }, label.toLowerCase())),
   );
   const body = el("tbody");
-  const count = el("p", { class: "muted" });
+  const count = el("span", { class: "muted" });
 
   const refresh = () => {
     const q = search.value.trim().toLowerCase();
-    const rows = devices.filter(
-      (d) =>
-        (!status.value || d.status === status.value) &&
-        (!type.value || d.type === type.value) &&
-        (!q ||
-          [d.displayName, d.hostname, vendorOf(d), d.lastIp, d.mac, d.category]
-            .filter(Boolean)
-            .some((v) => v.toLowerCase().includes(q))),
-    );
-    count.textContent = `${rows.length} appareil(s) sur ${devices.length}`;
+    const rows = devices
+      .filter(
+        (d) =>
+          (!status.value || d.status === status.value) &&
+          (!type.value || d.type === type.value) &&
+          (!q ||
+            [d.displayName, d.hostname, vendorOf(d), d.lastIp, d.mac, d.category]
+              .filter(Boolean)
+              .some((v) => v.toLowerCase().includes(q))),
+      )
+      .sort((a, b) => numbers.get(b.id) - numbers.get(a.id));
+    count.textContent = `${rows.length} inscription(s) sur ${devices.length}`;
     body.replaceChildren(
       ...rows.map((d) =>
         el(
           "tr",
           {
-            class: "clickable",
+            class: "row",
             onclick: (e) => {
               if (!e.target.closest("a")) navigate(`/devices/${d.id}`);
             },
           },
-          el("td", {}, link(`/devices/${d.id}`, deviceName(d)), d.category ? el("div", { class: "muted" }, d.category) : null),
+          el("td", { class: "no" }, pad(numbers.get(d.id), 3)),
+          el(
+            "td",
+            {},
+            el("div", { class: "name" }, link(`/devices/${d.id}`, deviceName(d))),
+            d.category ? el("div", { class: "note" }, d.category) : null,
+          ),
           el("td", {}, vendorOf(d) || "—"),
           el("td", {}, TYPE[d.type] || "—"),
-          el("td", { class: "mono" }, d.lastIp || "—"),
-          el("td", { class: "mono" }, d.mac),
-          el("td", {}, chip(STATUS[d.status] || d.status, d.status)),
-          el("td", { title: when(d.lastSeen) }, ago(d.lastSeen)),
+          el("td", {}, mono(d.lastIp || "—")),
+          el("td", {}, mono(d.mac)),
+          el("td", {}, mono(short(d.firstSeen))),
+          el("td", { title: when(d.lastSeen), class: "nowrap" }, ago(d.lastSeen)),
+          el("td", {}, visa(d.status)),
         ),
       ),
     );
@@ -321,173 +385,59 @@ async function networkView(id) {
   refresh();
 
   show(
-    el("p", {}, link("/networks", "← Réseaux")),
-    el("h1", {}, networkName(network), " ", chip(TRUST[network.trust], network.trust)),
-    el("p", { class: "sub" }, `${network.subnet} · ${monitoring(network)}`),
-    el("div", { class: "filters" }, search, status, type),
-    count,
+    el("p", { class: "back" }, link("/networks", "← Registres")),
+    el("p", { class: "folio" }, `Folio ${pad(network.id, 2)} · ${TRUST[network.trust]}`),
+    el("h1", {}, `Registre — ${networkName(network)}`),
+    el("p", { class: "sub" }, `${network.subnet}. ${monitoring(network)}`),
+    addressPlan(network.subnet, devices),
+    el("h2", { class: "section" }, "Inscriptions"),
     devices.length === 0
-      ? el("p", { class: "empty" }, "Aucun appareil observé sur ce réseau.")
-      : el(
-          "div",
-          { class: "table-wrap" },
+      ? el("p", { class: "empty" }, "Aucun appareil inscrit sur ce réseau.")
+      : [
+          el("div", { class: "filters" }, search, status, type, count),
           el(
-            "table",
-            {},
+            "div",
+            { class: "scroll" },
             el(
-              "thead",
-              {},
-              el("tr", {}, ["Appareil", "Fabricant", "Type", "IP", "MAC", "Statut", "Vu"].map((h) => el("th", {}, h))),
+              "table",
+              { class: "ledger" },
+              el(
+                "thead",
+                {},
+                el(
+                  "tr",
+                  {},
+                  el("th", { class: "no" }, "n°"),
+                  ["Appareil", "Fabricant", "Type", "Adresse IP", "MAC", "Inscrit le", "Vu", "Visa"].map((h) => el("th", {}, h)),
+                ),
+              ),
+              body,
             ),
-            body,
           ),
-        ),
+        ],
   );
 }
 
-async function deviceView(id) {
-  const detail = await api("GET", `/ui/devices/${id}`);
-  const d = detail.device;
-  document.title = `${deviceName(d)} · NetLedger`;
-
-  const name = el("input", { value: d.displayName || "", maxlength: 64, placeholder: d.hostname || "" });
-  const category = el("input", { value: d.category || "", maxlength: 32, list: "categories" });
-  const save = el(
-    "form",
-    {
-      class: "inline",
-      onsubmit: async (e) => {
-        e.preventDefault();
-        await run(
-          () => api("PATCH", `/ui/devices/${id}`, { displayName: name.value, category: category.value }),
-          "Fiche enregistrée",
-        );
-        route();
-      },
-    },
-    el("label", {}, "Nom", name),
-    el("label", {}, "Catégorie", category),
-    el("datalist", { id: "categories" }, CATEGORIES.map((c) => el("option", { value: c }))),
-    el("button", { type: "submit", class: "primary" }, "Enregistrer"),
-  );
-
-  const statusButtons = el(
-    "div",
-    { class: "actions" },
-    [
-      ["approved", "Approuver"],
-      ["guest", "Invité"],
-      ["suspect", "Suspect"],
-      ["ignored", "Ignorer"],
-      ["new", "Nouveau"],
-    ].map(([value, label]) =>
-      el(
-        "button",
-        {
-          type: "button",
-          "aria-pressed": String(d.status === value),
-          onclick: async () => {
-            await run(() => api("PATCH", `/ui/devices/${id}`, { status: value }), `Statut : ${STATUS[value]}`);
-            route();
-          },
-        },
-        label,
-      ),
-    ),
-  );
-
-  const candidates = [...detail.mergeCandidates].sort(
-    (a, b) => (b.status === "approved") - (a.status === "approved") || deviceName(a).localeCompare(deviceName(b)),
-  );
-  const target = el(
-    "select",
-    { "aria-label": "Appareil connu" },
-    el("option", { value: "" }, "Choisir l'appareil connu…"),
-    candidates.map((c) => el("option", { value: c.id }, `${deviceName(c)} · ${STATUS[c.status]} · ${c.mac}`)),
-  );
-  const merge = el(
-    "form",
-    {
-      class: "inline",
-      onsubmit: async (e) => {
-        e.preventDefault();
-        if (!target.value) return;
-        const chosen = candidates.find((c) => String(c.id) === target.value);
-        if (!confirm(`Fusionner cette fiche dans « ${deviceName(chosen)} » ? Son historique y sera rattaché et cette fiche disparaîtra.`)) return;
-        const kept = await run(() => api("POST", `/ui/devices/${id}/merge`, { into: Number(target.value) }), "Fiches fusionnées");
-        if (kept) navigate(`/devices/${kept.id}`);
-      },
-    },
-    target,
-    el("button", { type: "submit" }, "Fusionner"),
-  );
-
-  show(
-    el("p", {}, link(`/networks/${d.networkId}`, `← ${networkName(detail.network)}`)),
-    el("h1", {}, deviceName(d), " ", chip(STATUS[d.status] || d.status, d.status)),
-    el("p", { class: "sub" }, `${TYPE[d.type] || "Type inconnu"} · ${vendorOf(d) || "fabricant inconnu"}`),
-    el(
-      "div",
-      { class: "grid2" },
-      el(
-        "div",
-        { class: "card" },
-        el(
-          "dl",
-          { class: "facts" },
-          fact("Adresse MAC", d.mac, true),
-          fact("Fabricant", vendorOf(d) || "—"),
-          fact("Type probable", TYPE[d.type] || "—"),
-          fact("Dernière IP", d.lastIp || "—", true),
-          fact("Nom d'hôte", d.hostname || "—"),
-          fact("Empreinte DHCP", d.dhcpFingerprint || "—", true),
-          fact("Vu la première fois", when(d.firstSeen)),
-          fact("Vu la dernière fois", `${when(d.lastSeen)} (${ago(d.lastSeen)})`),
-        ),
-      ),
-      el(
-        "div",
-        { class: "card" },
-        save,
-        el("h2", {}, "Statut"),
-        statusButtons,
-        el("h2", {}, "Même appareil qu'une autre fiche ?"),
-        el("p", { class: "muted" }, "Un téléphone qui change d'adresse privée crée une nouvelle fiche : fusionnez-la avec l'appareil connu."),
-        candidates.length ? merge : el("p", { class: "muted" }, "Aucune autre fiche sur ce réseau."),
-      ),
-    ),
-    el("h2", {}, "Adresses IP"),
-    table(["IP", "Première fois", "Dernière fois"], detail.ips, (ip) => [mono(ip.ip), when(ip.firstSeen), when(ip.lastSeen)]),
-    el("h2", {}, "Services mDNS"),
-    table(["Type", "Nom", "Port", "Vu"], detail.services, (s) => [mono(s.type), s.name || "—", s.port ?? "—", ago(s.lastSeen)]),
-    el("h2", {}, "Événements"),
-    timeline(detail.events, false),
-    el("h2", {}, `Observations récentes (${detail.observations.length} au plus récent)`),
-    table(["Source", "IP", "Détail", "Moment"], detail.observations, (o) => [
-      SOURCE[o.source] || o.source,
-      mono(o.ip || "—"),
-      observationDetail(o.detail),
-      when(o.observedAt),
-    ]),
-  );
-}
+// --- One entry (device) -------------------------------------------------------------------
 
 function fact(label, value, monospace) {
-  return [el("dt", {}, label), el("dd", { class: monospace ? "mono" : "" }, value)];
-}
-
-function mono(text) {
-  return el("span", { class: "mono" }, text);
-}
-
-function table(headers, rows, cells) {
-  if (!rows.length) return el("p", { class: "muted" }, "Rien pour l'instant.");
   return el(
     "div",
-    { class: "table-wrap" },
+    { class: "fact" },
+    el("span", { class: "k" }, label),
+    el("span", { class: "dots", "aria-hidden": "true" }),
+    el("span", { class: "v" + (monospace ? " mono" : "") }, value),
+  );
+}
+
+function ledgerTable(headers, rows, cells) {
+  if (!rows.length) return el("p", { class: "empty" }, "Rien pour l'instant.");
+  return el(
+    "div",
+    { class: "scroll" },
     el(
       "table",
-      {},
+      { class: "ledger" },
       el("thead", {}, el("tr", {}, headers.map((h) => el("th", {}, h)))),
       el("tbody", {}, rows.map((r) => el("tr", {}, cells(r).map((c) => el("td", {}, c))))),
     ),
@@ -509,27 +459,162 @@ function observationDetail(json) {
   }
 }
 
-function timeline(events, withNetwork) {
-  if (!events.length) return el("p", { class: "muted" }, "Aucun événement.");
-  return el(
-    "ul",
-    { class: "timeline card" },
-    events.map((e) =>
+async function deviceView(id) {
+  const detail = await api("GET", `/ui/devices/${id}`);
+  const d = detail.device;
+  const number = entryNumbers([d, ...detail.mergeCandidates]).get(d.id);
+  document.title = `${deviceName(d)} · NetLedger`;
+
+  const name = el("input", { id: "name", value: d.displayName || "", maxlength: 64, placeholder: d.hostname || "" });
+  const category = el("input", { id: "category", value: d.category || "", maxlength: 32, list: "categories" });
+  const fields = el(
+    "form",
+    {
+      class: "fields",
+      onsubmit: async (e) => {
+        e.preventDefault();
+        await run(() => api("PATCH", `/ui/devices/${id}`, { displayName: name.value, category: category.value }), "Inscription mise à jour");
+        route();
+      },
+    },
+    el("label", { for: "name" }, "nom", name),
+    el("label", { for: "category" }, "catégorie", category),
+    el("datalist", { id: "categories" }, CATEGORIES.map((c) => el("option", { value: c }))),
+    el("button", { type: "submit", class: "textbtn" }, "Enregistrer"),
+  );
+
+  const stamps = el(
+    "div",
+    { class: "stamps" },
+    STAMPS.map(([value, label]) =>
       el(
-        "li",
-        {},
-        el("span", { class: "muted" }, when(e.occurredAt)),
-        el(
-          "div",
-          {},
-          el("div", { class: "title" }, e.title),
-          el("div", {}, e.message),
-          e.deviceId ? el("div", {}, link(`/devices/${e.deviceId}`, e.deviceLabel || "Voir l'appareil")) : null,
-          withNetwork ? el("div", { class: "muted" }, link(`/networks/${e.networkId}`, `Réseau ${e.networkId}`)) : null,
-        ),
+        "button",
+        {
+          type: "button",
+          class: "stamp " + value,
+          "aria-pressed": String(d.status === value),
+          onclick: async () => {
+            await run(() => api("PATCH", `/ui/devices/${id}`, { status: value }), `Visa : ${VISA[value]}`);
+            route();
+          },
+        },
+        el("span", {}, label),
       ),
     ),
   );
+
+  const candidates = [...detail.mergeCandidates].sort(
+    (a, b) => (b.status === "approved") - (a.status === "approved") || deviceName(a).localeCompare(deviceName(b)),
+  );
+  const target = el(
+    "select",
+    { "aria-label": "Inscription à garder" },
+    el("option", { value: "" }, "choisir l'appareil connu…"),
+    candidates.map((c) => el("option", { value: c.id }, `${deviceName(c)} · ${VISA[c.status]} · ${c.mac}`)),
+  );
+  const merge = el(
+    "form",
+    {
+      class: "fields",
+      onsubmit: async (e) => {
+        e.preventDefault();
+        if (!target.value) return;
+        const chosen = candidates.find((c) => String(c.id) === target.value);
+        if (!confirm(`Reporter cette inscription sur « ${deviceName(chosen)} » ? Son historique y sera rattaché et celle-ci sera rayée.`)) return;
+        const kept = await run(() => api("POST", `/ui/devices/${id}/merge`, { into: Number(target.value) }), "Inscriptions fusionnées");
+        if (kept) navigate(`/devices/${kept.id}`);
+      },
+    },
+    target,
+    el("button", { type: "submit", class: "textbtn" }, "Fusionner"),
+  );
+
+  show(
+    el("p", { class: "back" }, link(`/networks/${d.networkId}`, `← Registre — ${networkName(detail.network)}`)),
+    el("p", { class: "folio" }, `Inscription n° ${pad(number, 3)} · folio ${pad(d.networkId, 2)}`),
+    el("h1", {}, deviceName(d), " ", visa(d.status)),
+    el("p", { class: "sub" }, `${TYPE[d.type] || "Type inconnu"} · ${vendorOf(d) || "fabricant inconnu"}`),
+    el(
+      "div",
+      { class: "columns" },
+      el(
+        "div",
+        {},
+        el("h2", { class: "section" }, "Signalement"),
+        fact("Adresse MAC", d.mac, true),
+        fact("Fabricant", vendorOf(d) || "—"),
+        fact("Type probable", TYPE[d.type] || "—"),
+        fact("Dernière adresse IP", d.lastIp || "—", true),
+        fact("Nom d'hôte", d.hostname || "—"),
+        fact("Empreinte DHCP", d.dhcpFingerprint || "—", true),
+        fact("Inscrit le", when(d.firstSeen)),
+        fact("Vu pour la dernière fois", `${when(d.lastSeen)} (${ago(d.lastSeen)})`),
+      ),
+      el(
+        "div",
+        {},
+        el("h2", { class: "section" }, "Annotations"),
+        fields,
+        el("h2", { class: "section" }, "Visa"),
+        stamps,
+        el("h2", { class: "section" }, "Même appareil qu'une autre inscription ?"),
+        el("p", { class: "muted" }, "Un téléphone qui change d'adresse privée s'inscrit une seconde fois : reportez cette inscription sur l'appareil connu."),
+        candidates.length ? merge : el("p", { class: "empty" }, "Aucune autre inscription sur ce réseau."),
+      ),
+    ),
+    el("h2", { class: "section" }, "Adresses IP"),
+    ledgerTable(["Adresse", "Première fois", "Dernière fois"], detail.ips, (ip) => [mono(ip.ip), when(ip.firstSeen), when(ip.lastSeen)]),
+    el("h2", { class: "section" }, "Services annoncés"),
+    ledgerTable(["Type", "Nom", "Port", "Vu"], detail.services, (s) => [mono(s.type), s.name || "—", mono(s.port ?? "—"), ago(s.lastSeen)]),
+    el("h2", { class: "section" }, "Journal de l'appareil"),
+    journal(detail.events, false),
+    el("h2", { class: "section" }, `Observations récentes (${detail.observations.length})`),
+    ledgerTable(["Source", "Adresse", "Détail", "Moment"], detail.observations, (o) => [
+      SOURCE[o.source] || o.source,
+      mono(o.ip || "—"),
+      observationDetail(o.detail),
+      mono(short(o.observedAt)),
+    ]),
+  );
+}
+
+// --- Journal (events) -----------------------------------------------------------------------
+
+function journal(events, withNetwork) {
+  if (!events.length) return el("p", { class: "empty" }, "Aucun événement.");
+  const days = new Map();
+  for (const e of events) {
+    const day = dayTitle.format(new Date(e.occurredAt));
+    if (!days.has(day)) days.set(day, []);
+    days.get(day).push(e);
+  }
+  return [...days].map(([day, list]) => [
+    el("h3", { class: "day" }, day),
+    el(
+      "ul",
+      { class: "journal" },
+      list.map((e) =>
+        el(
+          "li",
+          {},
+          el("span", { class: "time" }, clock.format(new Date(e.occurredAt))),
+          el(
+            "div",
+            {},
+            el("div", { class: "title" }, e.title),
+            el("div", {}, e.message),
+            el(
+              "div",
+              { class: "meta" },
+              e.deviceId ? link(`/devices/${e.deviceId}`, e.deviceLabel || "voir l'inscription") : null,
+              e.deviceId && withNetwork ? " · " : null,
+              withNetwork ? link(`/networks/${e.networkId}`, `folio ${pad(e.networkId, 2)}`) : null,
+            ),
+          ),
+        ),
+      ),
+    ),
+  ]);
 }
 
 async function eventsView(params) {
@@ -538,21 +623,22 @@ async function eventsView(params) {
     api("GET", "/ui/events" + (network ? `?network=${encodeURIComponent(network)}` : "")),
     api("GET", "/ui/networks"),
   ]);
-  document.title = "Chronologie · NetLedger";
+  document.title = "Journal · NetLedger";
   const filter = el(
     "select",
     {
-      "aria-label": "Réseau",
+      "aria-label": "Registre",
       onchange: (e) => navigate(e.target.value ? `/events?network=${e.target.value}` : "/events"),
     },
-    el("option", { value: "" }, "Tous les réseaux"),
+    el("option", { value: "" }, "tous les registres"),
     networks.map((n) => el("option", { value: n.id, selected: String(n.id) === network }, networkName(n))),
   );
   show(
-    el("h1", {}, "Chronologie"),
+    el("p", { class: "folio" }, `${events.length} entrée(s)`),
+    el("h1", {}, "Journal"),
     el("p", { class: "sub" }, "Alertes et événements, du plus récent au plus ancien."),
     el("div", { class: "filters" }, filter),
-    timeline(events, !network),
+    journal(events, !network),
   );
 }
 
