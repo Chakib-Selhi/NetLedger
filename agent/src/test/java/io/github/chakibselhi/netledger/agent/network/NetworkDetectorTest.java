@@ -118,7 +118,9 @@ class NetworkDetectorTest {
   @Test
   void javaLookupFindsLoopbackOrNothing() throws Exception {
     assertThat(NetworkDetector.javaInterfaceLookup("does-not-exist0")).isEmpty();
-    assertThat(NetworkDetector.javaInterfaceLookup("lo0"))
+    // The loopback interface is lo0 on macOS and lo on Linux (CI).
+    String loopback = java.net.NetworkInterface.getByName("lo0") != null ? "lo0" : "lo";
+    assertThat(NetworkDetector.javaInterfaceLookup(loopback))
         .hasValueSatisfying(a -> assertThat(a.ip()).isEqualTo("127.0.0.1"));
   }
 }

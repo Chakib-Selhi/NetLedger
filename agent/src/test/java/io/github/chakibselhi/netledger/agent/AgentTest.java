@@ -187,10 +187,12 @@ class AgentTest {
 
   @Test
   void keepsCapturingAndBufferingWhileTheServerIsDown() throws Exception {
+    // Down from the start: otherwise a fast replay is fully uploaded by the first tick and
+    // nothing is left to buffer.
+    server.observationsStatus = 503;
     Agent agent = agent(false);
     agent.tick();
     awaitReplay();
-    server.observationsStatus = 503;
 
     clock.advance(Duration.ofSeconds(5));
     agent.tick();
