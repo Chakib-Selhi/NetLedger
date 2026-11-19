@@ -21,11 +21,19 @@ public final class LaunchAgentInstaller {
 
   public static final String LABEL = "io.github.chakibselhi.netledger.agent";
 
+  static final int UNLOAD_CHECKS = 20;
+
   private final CommandRunner commands;
+  private final Runnable wait;
   private final Path launchAgents;
   private final Path log;
 
   public LaunchAgentInstaller(CommandRunner commands, Path home) {
+    this(commands, home, LaunchAgentInstaller::pause);
+  }
+
+  LaunchAgentInstaller(CommandRunner commands, Path home, Runnable wait) {
+    this.wait = wait;
     this.commands = commands;
     this.launchAgents = home.resolve("Library/LaunchAgents");
     this.log = home.resolve("Library/Logs/NetLedger/agent.log");
@@ -50,6 +58,11 @@ public final class LaunchAgentInstaller {
     if (changed) {
       if (loaded) {
         commands.run(List.of("launchctl", "bootout", service));
+        // bootout returns before the agent has exited; bootstrapping meanwhile fails with
+        // "Bootstrap failed: 5: Input/output error".
+        for (int i = 0; i < UNLOAD_CHECKS && isLoaded(service); i++) {
+          wait.run();
+        }
         loaded = false;
       }
       Files.createDirectories(launchAgents);
@@ -61,6 +74,14 @@ public final class LaunchAgentInstaller {
     }
     // Without -k, kickstart leaves a running agent alone: opening the app twice starts one agent.
     commands.run(List.of("launchctl", "kickstart", service));
+  }
+
+  private static void pause() {
+    try {
+      Thread.sleep(250);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
   }
 
   private boolean isLoaded(String service) {

@@ -18,6 +18,8 @@ class LaunchAgentInstallerTest {
 
   private final List<String> calls = new ArrayList<>();
   private boolean loaded;
+  private int stillLoadedAfterBootout;
+  private int waits;
 
   private final Path java = Path.of("/Applications/NetLedger.app/Contents/runtime/bin/java");
   private final Path jar = Path.of("/Applications/NetLedger.app/Contents/app/netledger-agent.jar");
@@ -30,12 +32,20 @@ class LaunchAgentInstallerTest {
           if (line.equals("id -u")) {
             return "501\n";
           }
+          if (line.startsWith("launchctl bootout")) {
+            loaded = false;
+          }
           if (line.startsWith("launchctl print") && !loaded) {
+            if (stillLoadedAfterBootout > 0) {
+              stillLoadedAfterBootout--;
+              return "";
+            }
             throw new IOException("launchctl exited with 113");
           }
           return "";
         },
-        home);
+        home,
+        () -> waits++);
   }
 
   @Test
@@ -71,9 +81,10 @@ class LaunchAgentInstallerTest {
   }
 
   @Test
-  void aMovedAppReloadsTheJob() throws IOException {
+  void aMovedAppReloadsTheJobOnceTheOldAgentHasExited() throws IOException {
     installer().installAndStart(java, jar);
     loaded = true;
+    stillLoadedAfterBootout = 2;
     calls.clear();
     Path moved = Path.of("/Users/me/Apps/NetLedger.app/Contents/app/netledger-agent.jar");
 
@@ -85,8 +96,12 @@ class LaunchAgentInstallerTest {
             "id -u",
             "launchctl print " + SERVICE,
             "launchctl bootout " + SERVICE,
+            "launchctl print " + SERVICE,
+            "launchctl print " + SERVICE,
+            "launchctl print " + SERVICE,
             "launchctl bootstrap gui/501 " + installer.plistFile(),
             "launchctl kickstart " + SERVICE);
+    assertThat(waits).isEqualTo(2);
     assertThat(Files.readString(installer.plistFile())).contains(moved.toString());
   }
 
