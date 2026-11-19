@@ -28,7 +28,14 @@ public final class ProcessCommandRunner implements CommandRunner {
       }
       String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
       if (process.exitValue() != 0) {
-        throw new IOException(command.get(0) + " exited with " + process.exitValue());
+        String first = output.strip().lines().findFirst().orElse("");
+        throw new IOException(
+            command.get(0)
+                + " exited with "
+                + process.exitValue()
+                + (first.isEmpty()
+                    ? ""
+                    : ": " + first.substring(0, Math.min(first.length(), 200))));
       }
       return output;
     } catch (InterruptedException e) {

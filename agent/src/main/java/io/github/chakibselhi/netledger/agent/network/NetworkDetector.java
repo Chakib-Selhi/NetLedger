@@ -88,6 +88,11 @@ public final class NetworkDetector {
   }
 
   /** Extracts and normalizes the MAC from {@code arp -n} output (padding octets to 2 digits). */
+  /** Gateway IPv4 address in the output of {@code route -n get default}. */
+  public static Optional<String> parseGateway(String routeOutput) {
+    return field(GATEWAY, routeOutput).filter(NetworkDetector::isIpv4);
+  }
+
   static Optional<String> parseArpMac(String arpOutput) {
     Matcher matcher = ARP_MAC.matcher(arpOutput);
     if (!matcher.find()) {

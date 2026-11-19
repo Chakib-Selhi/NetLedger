@@ -143,7 +143,7 @@ public final class SetupWindow {
     frame.pack();
   }
 
-  private static JPanel row(Check c) {
+  private JPanel row(Check c) {
     var row = new JPanel();
     row.setLayout(new BoxLayout(row, BoxLayout.Y_AXIS));
     row.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -156,12 +156,39 @@ public final class SetupWindow {
     if (c.fix() != null) {
       // A selectable field, so the command can be copied into the Terminal.
       var fix = new JTextField(c.fix());
+      // Without a column count, a long command sets the window wider than the screen.
+      fix.setColumns(40);
       fix.setEditable(false);
       fix.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
       fix.setAlignmentX(Component.LEFT_ALIGNMENT);
       row.add(fix);
     }
+    if (c.action() != null) {
+      var button = new JButton(c.actionLabel());
+      button.setAlignmentX(Component.LEFT_ALIGNMENT);
+      button.addActionListener(
+          e -> {
+            button.setEnabled(false);
+            Thread.ofVirtual()
+                .start(
+                    () -> {
+                      c.action().run();
+                      // Leaves time to answer macOS's prompt before checking again.
+                      sleep(4_000);
+                      SwingUtilities.invokeLater(this::refresh);
+                    });
+          });
+      row.add(button);
+    }
     return row;
+  }
+
+  private static void sleep(long millis) {
+    try {
+      Thread.sleep(millis);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
   }
 
   private static JTextArea text(String value, Color color) {

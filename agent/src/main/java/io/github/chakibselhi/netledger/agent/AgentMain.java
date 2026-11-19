@@ -13,6 +13,7 @@ import io.github.chakibselhi.netledger.agent.network.NetworkDetector;
 import io.github.chakibselhi.netledger.agent.scan.ArpScanner;
 import io.github.chakibselhi.netledger.agent.scan.PcapFrameSender;
 import io.github.chakibselhi.netledger.agent.server.ServerClient;
+import io.github.chakibselhi.netledger.agent.setup.LocalNetworkAccess;
 import io.github.chakibselhi.netledger.agent.setup.SetupChecks;
 import io.github.chakibselhi.netledger.agent.system.CommandRunner;
 import io.github.chakibselhi.netledger.agent.system.ProcessCommandRunner;
@@ -26,6 +27,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
@@ -45,9 +47,36 @@ public final class AgentMain {
     AgentConfig config = AgentConfig.load(configFile);
     var commands = new ProcessCommandRunner(Duration.ofSeconds(5));
     var keychain = new KeychainTokenStore(commands);
+    var localNetwork =
+        new LocalNetworkAccess(
+            new LocalNetworkAccess.Probe() {
+              @Override
+              public Optional<String> gateway() throws IOException {
+                return NetworkDetector.parseGateway(
+                    commands.run(List.of("route", "-n", "get", "default")));
+              }
+
+              @Override
+              public String arpEntry(String gateway) {
+                try {
+                  return commands.run(List.of("arp", "-n", gateway));
+                } catch (IOException e) {
+                  return String.valueOf(e.getMessage());
+                }
+              }
+            },
+            () -> new MdnsQuerier().queryServiceTypes("0.0.0.0"));
     var setup =
         new SetupChecks(
             () -> Files.isReadable(Path.of("/dev/bpf0")),
+            localNetwork::state,
+            () -> {
+              try {
+                localNetwork.request();
+              } catch (IOException e) {
+                log.warn("Local network request failed: {}", e.getMessage());
+              }
+            },
             keychain::read,
             t -> new ServerClient(config.serverUrl(), t, Duration.ofSeconds(3)).health());
     List<SetupChecks.Check> checks = setup.run();
