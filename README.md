@@ -1,5 +1,11 @@
 # NetLedger
 
+[![CI](https://github.com/Chakib-Selhi/NetLedger/actions/workflows/ci.yml/badge.svg)](https://github.com/Chakib-Selhi/NetLedger/actions/workflows/ci.yml)
+![Java 21](https://img.shields.io/badge/Java-21-orange)
+![Spring Boot 3](https://img.shields.io/badge/Spring%20Boot-3.5-6DB33F)
+![macOS](https://img.shields.io/badge/agent-macOS%2013%2B-lightgrey)
+[![Licence MIT](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
+
 *[English version](README.en.md)*
 
 NetLedger tient le registre des appareils présents sur le réseau auquel votre Mac est connecté. Il écoute le trafic ARP, DHCP et mDNS, identifie le fabricant et le type probable de chaque appareil, garde l'historique par réseau et vous prévient quand un appareil inconnu apparaît.
@@ -113,6 +119,13 @@ mvn verify
 
 Java 21, Maven multi-modules (`core`, `agent`, `server`), JUnit 5 et AssertJ. Les décodeurs sont testés sur de vraies captures PCAP anonymisées (`core/src/test/resources/pcap`). JaCoCo exige 80 % de couverture des lignes sur `core` et sur la corrélation, l'identification et les alertes du serveur. Spotless (google-java-format) vérifie le format. GitHub Actions exécute les tests et construit l'image Docker.
 
+## Documentation
+
+- [Architecture](docs/architecture.md) : parcours d'une observation, décisions de conception, modèle de menaces, stratégie de tests (en anglais).
+- [Protocoles](docs/protocols.md) : ARP, DHCP et mDNS octet par octet, et ce que NetLedger en garde (en anglais).
+- [Identification](docs/identification.md) : fabricant, adresses privées, règles de type probable.
+- [Politique de sécurité](SECURITY.md) et [journal des versions](CHANGELOG.md).
+
 ## Limites connues
 
 - **Ce qu'une machine voit** : sur un réseau commuté ou en Wi-Fi, un ordinateur ne reçoit que le trafic diffusé et le sien. ARP, DHCP et mDNS sont justement diffusés, mais un appareil silencieux peut rester invisible, sauf si le balayage ARP (réseau « Mon réseau » seulement) est activé.
@@ -121,3 +134,7 @@ Java 21, Maven multi-modules (`core`, `agent`, `server`), JUnit 5 et AssertJ. Le
 - **Notifications** : l'agent les affiche avec `osascript`. Sur certaines configurations de macOS, elles n'apparaissent pas. L'icône de la barre des menus et son menu « Dernières alertes » restent alors la référence.
 - **Application non signée** par un compte développeur Apple : confirmation demandée au premier lancement.
 - **Un seul agent**, IPv4 seulement. Démarrage à l'ouverture de session, SSDP, plusieurs agents et IPv6 sont prévus pour plus tard.
+
+## Licence
+
+[MIT](LICENSE) © 2026 Chakib Selhi

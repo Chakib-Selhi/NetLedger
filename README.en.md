@@ -1,5 +1,11 @@
 # NetLedger
 
+[![CI](https://github.com/Chakib-Selhi/NetLedger/actions/workflows/ci.yml/badge.svg)](https://github.com/Chakib-Selhi/NetLedger/actions/workflows/ci.yml)
+![Java 21](https://img.shields.io/badge/Java-21-orange)
+![Spring Boot 3](https://img.shields.io/badge/Spring%20Boot-3.5-6DB33F)
+![macOS](https://img.shields.io/badge/agent-macOS%2013%2B-lightgrey)
+[![License MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 *[Version française](README.md)*
 
 NetLedger keeps a ledger of the devices on the network your Mac is connected to. It listens to ARP, DHCP and mDNS traffic, identifies each device's vendor and probable type, keeps a per-network history, and warns you when an unknown device shows up.
@@ -113,6 +119,13 @@ mvn verify
 
 Java 21, multi-module Maven (`core`, `agent`, `server`), JUnit 5 and AssertJ. Decoders are tested against real, anonymized PCAP captures (`core/src/test/resources/pcap`). JaCoCo requires 80 % line coverage on `core` and on the server's correlation, identification and alerting. Spotless (google-java-format) checks formatting. GitHub Actions runs the tests and builds the Docker image.
 
+## Documentation
+
+- [Architecture](docs/architecture.md): an observation's path, design decisions, threat model, testing strategy.
+- [Protocols](docs/protocols.md): ARP, DHCP and mDNS byte by byte, and what NetLedger keeps.
+- [Identification](docs/identification.md): vendor, private addresses, probable type rules.
+- [Security policy](SECURITY.md) and [changelog](CHANGELOG.md).
+
 ## Known limits
 
 - **What one machine sees**: on a switched or Wi-Fi network, a computer receives only broadcast traffic and its own. ARP, DHCP and mDNS are broadcast, but a silent device can stay invisible unless the ARP sweep ("My network" only) is on.
@@ -121,3 +134,7 @@ Java 21, multi-module Maven (`core`, `agent`, `server`), JUnit 5 and AssertJ. De
 - **Notifications**: the agent shows them with `osascript`. On some macOS setups they do not appear. The menu bar icon and its "Dernières alertes" menu remain the reference then.
 - **App not signed** with an Apple developer account: confirmation required at first launch.
 - **One agent**, IPv4 only. Login start, SSDP, several agents and IPv6 are planned for later.
+
+## License
+
+[MIT](LICENSE) © 2026 Chakib Selhi
