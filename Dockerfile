@@ -26,7 +26,7 @@ RUN mkdir /oui \
     done
 
 # --- Runtime --------------------------------------------------------------------------------
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:24-jre
 RUN groupadd --system netledger \
  && useradd --system --gid netledger --no-create-home --shell /usr/sbin/nologin netledger \
  && mkdir /data && chown netledger:netledger /data
