@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.0 — 2026-11-19
+
+### Dashboard
+
+- New ledger design: cream paper and ruled lines, numbered entries, red ink for devices to review, rubber-stamp statuses, serif and monospace type, automatic dark theme.
+- Address plan: one square per address of the subnet (up to /22), colored by status, each linking to its device.
+- Journal grouped by day.
+
 ## 1.0.0 — 2026-11-19
 
 First release.

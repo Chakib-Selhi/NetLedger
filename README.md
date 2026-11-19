@@ -19,15 +19,19 @@ Un réseau domestique compte des dizaines d'appareils : téléphones, ordinateur
 
 ## Captures
 
+Le tableau de bord reprend la forme d'un livre de comptes, ce que NetLedger est vraiment : un **registre**. Chaque réseau est un folio, chaque appareil une inscription numérotée qu'on n'efface jamais, et ce qui reste à approuver est écrit à l'encre rouge (« à viser »). Au-dessus du registre, le **plan d'adressage** montre l'espace d'adresses entier, une case par adresse IP : un nouvel appareil ou une adresse inattendue se repère d'un coup d'œil. Les statuts se donnent avec des tampons. Le thème sombre suit les réglages de macOS.
+
 Les captures viennent du serveur de démonstration (`./scripts/demo.sh start`) : les noms et les adresses sont inventés.
 
-| Réseaux et statut | Appareils d'un réseau |
-| --- | --- |
-| ![Réseaux](docs/screenshots/networks.png) | ![Appareils](docs/screenshots/devices.png) |
+![Registre d'un réseau avec son plan d'adressage](docs/screenshots/devices.png)
 
-| Fiche d'appareil | Chronologie |
+| Registres (réseaux et statut) | Inscription d'un appareil |
 | --- | --- |
-| ![Fiche](docs/screenshots/device.png) | ![Chronologie](docs/screenshots/events.png) |
+| ![Registres](docs/screenshots/networks.png) | ![Inscription](docs/screenshots/device.png) |
+
+| Journal des alertes | Thème sombre |
+| --- | --- |
+| ![Journal](docs/screenshots/events.png) | ![Thème sombre](docs/screenshots/devices-dark.png) |
 
 ## Architecture
 

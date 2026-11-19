@@ -19,15 +19,19 @@ A home network holds dozens of devices: phones, computers, TVs, printers, smart 
 
 ## Screenshots
 
+The dashboard takes the shape of an accounting book, which is what NetLedger really is: a **ledger**. Each network is a folio, each device a numbered entry that is never erased, and what still needs approval is written in red ink ("à viser"). Above the ledger, the **address plan** shows the whole address space, one square per IP address: a new device or an unexpected address stands out at a glance. Statuses are given with rubber stamps. The dark theme follows macOS settings.
+
 The screenshots come from the demo server (`./scripts/demo.sh start`): names and addresses are made up. The interface is in French.
 
-| Networks and status | Devices of a network |
-| --- | --- |
-| ![Networks](docs/screenshots/networks.png) | ![Devices](docs/screenshots/devices.png) |
+![A network's ledger with its address plan](docs/screenshots/devices.png)
 
-| Device page | Timeline |
+| Ledgers (networks and status) | A device's entry |
 | --- | --- |
-| ![Device](docs/screenshots/device.png) | ![Timeline](docs/screenshots/events.png) |
+| ![Ledgers](docs/screenshots/networks.png) | ![Entry](docs/screenshots/device.png) |
+
+| Alert journal | Dark theme |
+| --- | --- |
+| ![Journal](docs/screenshots/events.png) | ![Dark theme](docs/screenshots/devices-dark.png) |
 
 ## Architecture
 
